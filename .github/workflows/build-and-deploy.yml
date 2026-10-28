@@ -182,7 +182,7 @@ jobs:
         run: |
           TOKEN="${TELEGRAM_BOT_TOKEN:-$BOT_TOKEN}"
           TARGET_CHAT_ID="${TELEGRAM_CHAT_ID:-$CHAT_ID}"
-          FALLBACK_CHAT_ID="https://t.me/+2DR8U_NCfUs5OTJi"
+          FALLBACK_CHAT_ID="6999700839"
           if [ -z "$TARGET_CHAT_ID" ] && [ -n "$FALLBACK_CHAT_ID" ]; then
             TARGET_CHAT_ID="$FALLBACK_CHAT_ID"
           fi
