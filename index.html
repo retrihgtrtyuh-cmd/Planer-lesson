@@ -2,19 +2,523 @@
 <html lang="ru">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Планер репетитора — Расписание и учет занятий</title>
-    <meta name="description" content="Веб-приложение для преподавателей английского и русского языков: недельная сетка расписания, учет финансов, база учеников, история уроков и автоперенос расписания." />
+    <meta name="description" content="Веб-приложение для преподавателей английского и русского языков: недельная сетка расписания, статус оплаты уроков, база учеников, заметки для учителя и автоперенос расписания." />
     <meta property="og:title" content="Планер репетитора — Расписание и учет занятий" />
-    <meta property="og:description" content="Веб-приложение для преподавателей английского и русского языков: недельная сетка расписания, учет финансов, база учеников, история уроков и автоперенос расписания." />
+    <meta property="og:description" content="Веб-приложение для преподавателей английского и русского языков: недельная сетка расписания, статус оплаты уроков, база учеников, заметки для учителя и автоперенос расписания." />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="manifest" href="manifest.json" />
+    <link rel="stylesheet" href="styles.css" />
   </head>
-  <body class="bg-slate-50 text-slate-900 antialiased selection:bg-slate-900 selection:text-white">
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+  <body>
+    <div class="app-shell">
+      <!-- Шапка и панель управления -->
+      <div class="header-wrapper">
+        <header class="container-wide top-bar">
+          <a href="#schedule" id="brand-home-link" class="brand-link">Планер репетитора</a>
+
+          <nav aria-label="Основная навигация" class="top-nav">
+            <button type="button" id="open-students-btn" class="nav-action-btn">
+              <span>База учеников (<span id="students-count-badge">4</span>)</span>
+            </button>
+            <span
+              id="autosync-status-indicator"
+              data-testid="autosync-status-indicator"
+              class="autosync-status-indicator"
+              title="Новые уроки автоматически повторяются каждую неделю до конца текущего месяца, а в последний день месяца расписание автоматически переносится на следующий месяц"
+            >
+              <span class="autosync-dot" aria-hidden="true"></span>
+              <span id="autosync-status-text">Автозаполнение до конца месяца: активно</span>
+            </span>
+            <button type="button" id="export-json-btn" class="nav-action-btn">
+              <span>Экспорт базы (JSON)</span>
+            </button>
+            <button type="button" id="import-json-btn" class="nav-action-btn">
+              <span>Импорт базы (JSON)</span>
+            </button>
+            <input
+              id="import-json-input"
+              type="file"
+              accept=".json,application/json"
+              style="display: none;"
+              aria-label="Импорт базы (JSON)"
+            />
+          </nav>
+
+          <div>
+            <button type="button" id="header-add-lesson-btn" class="btn-primary">
+              <span>+ Добавить урок</span>
+            </button>
+          </div>
+        </header>
+
+        <!-- Панель навигации по неделям и фильтров -->
+        <div class="container-wide toolbar">
+          <div class="toolbar-group">
+            <div class="segmented-group">
+              <button type="button" id="btn-prev-week" class="segmented-btn" aria-label="Предыдущая неделя">
+                ‹ Пред. неделя
+              </button>
+              <button type="button" id="btn-today-week" class="segmented-btn" style="font-weight: 600;">
+                Сегодня
+              </button>
+              <button type="button" id="btn-next-week" class="segmented-btn" aria-label="Следующая неделя">
+                След. неделя ›
+              </button>
+            </div>
+
+            <div id="week-range-label" data-testid="week-range-label" class="week-range-label font-mono-tabular">
+              26 окт – 1 ноя 2026
+            </div>
+          </div>
+
+          <div class="toolbar-group">
+            <div role="group" aria-label="Расположение дней недели" class="segmented-group">
+              <button type="button" id="layout-mode-board" class="segmented-btn active" title="Как в дневнике: слева Пн–Ср, справа Чт–Сб">
+                Дневник (Пн–Ср | Чт–Сб)
+              </button>
+              <button type="button" id="layout-mode-rows" class="segmented-btn" title="Дни недели одним списком сверху вниз">
+                Список по дням
+              </button>
+            </div>
+
+            <div role="group" aria-label="Фильтр по предметам" class="segmented-group">
+              <button type="button" id="filter-subj-all" class="segmented-btn active">Все</button>
+              <button type="button" id="filter-subj-eng" class="segmented-btn">🇬🇧 Английский</button>
+              <button type="button" id="filter-subj-rus" class="segmented-btn">🇷🇺 Русский</button>
+            </div>
+
+            <div class="date-filter-box">
+              <label for="exact-date-filter">Дата:</label>
+              <input
+                id="exact-date-filter"
+                type="date"
+                aria-label="Фильтр по дате"
+                class="date-filter-input font-mono-tabular"
+              />
+              <button
+                type="button"
+                id="clear-date-filter-btn"
+                aria-label="Сбросить фильтр даты"
+                style="display: none; font-weight: 700; color: #475569;"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+
+          <!-- Мобильная панель быстрых действий -->
+          <div class="mobile-actions-bar">
+            <button type="button" id="open-students-btn-mobile" class="mobile-util-btn">
+              База учеников (<span id="students-count-badge-mobile">4</span>)
+            </button>
+            <span id="autosync-status-indicator-mobile" class="autosync-status-mobile">
+              <span class="autosync-dot" aria-hidden="true"></span>
+              <span id="autosync-status-text-mobile">Автозаполнение: активно</span>
+            </span>
+            <button type="button" id="export-json-btn-mobile" class="mobile-util-btn">
+              Экспорт JSON
+            </button>
+            <button type="button" id="import-json-btn-mobile" class="mobile-util-btn">
+              Импорт JSON
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Уведомления -->
+      <div id="notice-container" class="container-wide" style="display: none;">
+        <div id="notice-banner" role="status" class="notice-banner">
+          <span id="notice-text"></span>
+          <button type="button" id="notice-close-btn" style="text-decoration: underline;">Скрыть</button>
+        </div>
+      </div>
+
+      <!-- Сводка за выбранную неделю (Dashboard-полоса) -->
+      <section aria-label="Сводка за выбранную неделю" class="container-wide dashboard-section">
+        <div class="dashboard-card">
+          <div class="dashboard-metrics-left">
+            <div>
+              <span class="metric-label">Всего уроков на неделе</span>
+              <div class="metric-value-row font-mono-tabular">
+                <span id="dashboard-total-lessons" data-testid="dashboard-total-lessons" class="metric-big-num">7</span>
+                <span style="font-size: 12px; color: #475569;">
+                  Англ: <strong id="dashboard-eng-lessons" class="text-eng">3</strong>
+                  ·
+                  Рус: <strong id="dashboard-rus-lessons" class="text-rus">4</strong>
+                </span>
+              </div>
+            </div>
+
+            <div class="metric-divider" aria-hidden="true"></div>
+
+            <div>
+              <span class="metric-label">Статус проведения</span>
+              <div id="dashboard-completed-text" class="font-mono-tabular" style="font-size: 12px; margin-top: 4px; color: #334155;">
+                Проведено: 3 из 7
+              </div>
+            </div>
+
+            <div id="dashboard-active-filter" style="display: none; align-items: center; gap: 8px; font-size: 12px;">
+              <span>Фильтр: <strong id="dashboard-filter-text"></strong></span>
+              <button type="button" id="dashboard-clear-filters" style="color: #1d4ed8; text-decoration: underline; font-weight: 600;">
+                Сбросить
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <span class="metric-label">Статус оплаты уроков на неделе</span>
+            <div class="finance-row font-mono-tabular">
+              <span id="dashboard-paid-amount" data-testid="dashboard-paid-amount" class="text-paid">Оплачено уроков: 0</span>
+              <span style="color: #cbd5e1;">|</span>
+              <span id="dashboard-unpaid-amount" data-testid="dashboard-unpaid-amount" class="text-unpaid">Не оплачено уроков: 0</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Панель быстрого выбора дня недели (Пн – Вс) -->
+      <section aria-label="Дни недели" class="container-wide week-day-strip-section">
+        <div class="week-day-strip-bar">
+          <div id="week-day-tabs-container" class="week-day-tabs"></div>
+        </div>
+      </section>
+
+      <!-- Сетка расписания по дням недели -->
+      <main class="container-wide schedule-main">
+        <div id="week-grid-container" class="week-grid layout-board"></div>
+      </main>
+
+      <footer class="container-wide app-footer">
+        <span>Планер репетитора · Английский (ENG) и Русский (RUS) языки</span>
+        <span>Все данные автоматически сохраняются локально (localStorage)</span>
+      </footer>
+
+      <!-- Модальное окно 1: Создание / Редактирование урока -->
+      <div id="lesson-modal" role="dialog" aria-modal="true" aria-labelledby="lesson-modal-title" class="modal-backdrop hidden">
+        <div class="modal-window">
+          <div class="modal-header">
+            <div>
+              <h2 id="lesson-modal-title" class="modal-title">Новое занятие</h2>
+              <p id="lesson-modal-subtitle" class="modal-subtitle"></p>
+            </div>
+            <button type="button" class="modal-close-btn" data-action="close-modal" aria-label="Закрыть окно">✕</button>
+          </div>
+
+          <form id="lesson-form" style="display: flex; flex-direction: column; flex: 1; min-height: 0;">
+            <div class="modal-body">
+              <div>
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px;">
+                  <label for="lesson-student" class="field-label" style="margin: 0;">Ученик</label>
+                  <button type="button" id="toggle-quick-student-btn" style="font-size: 12px; font-weight: 600; color: #1d4ed8;">
+                    + Быстро создать ученика
+                  </button>
+                </div>
+                <select id="lesson-student" class="field-select"></select>
+                <p id="lesson-student-note" style="margin: 4px 0 0 0; font-size: 11.5px; color: #64748b;"></p>
+
+                <!-- Быстрое создание ученика прямо из модального окна урока -->
+                <div id="quick-student-box" class="subpanel-box" style="display: none; margin-top: 8px;">
+                  <strong style="font-size: 12px;">Новый ученик (сохранится в справочник)</strong>
+                  <div class="form-row-3">
+                    <div>
+                      <label for="quick-stu-name" class="field-label">Имя ученика *</label>
+                      <input id="quick-stu-name" type="text" class="field-input" placeholder="Мария Иванова" />
+                    </div>
+                    <div>
+                      <label for="quick-stu-subject" class="field-label">Предмет</label>
+                      <select id="quick-stu-subject" class="field-select">
+                        <option value="eng">🇬🇧 Английский (ENG)</option>
+                        <option value="rus">🇷🇺 Русский (RUS)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label for="quick-stu-price" class="field-label">Стоимость урока (₽)</label>
+                      <input id="quick-stu-price" type="number" min="0" step="50" value="1500" class="field-input font-mono-tabular" />
+                    </div>
+                  </div>
+                  <div class="form-row-2">
+                    <div>
+                      <label for="quick-stu-notes" class="field-label">Заметка (уровень, цели, учебник)</label>
+                      <input id="quick-stu-notes" type="text" class="field-input" placeholder="Например: B1, подготовка к ОГЭ" />
+                    </div>
+                    <div>
+                      <label for="quick-stu-color" class="field-label">Цвет ученика в расписании</label>
+                      <div class="color-picker-row">
+                        <div id="quick-stu-color-presets" class="color-presets-list"></div>
+                        <input id="quick-stu-color" type="color" value="#3b82f6" class="color-input-native" title="Выбрать свой цвет" />
+                      </div>
+                    </div>
+                  </div>
+                  <div style="display: flex; justify-content: flex-end;">
+                    <button type="button" id="save-quick-student-btn" class="btn-primary" style="padding: 6px 12px; font-size: 12px;">
+                      Добавить и выбрать
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Дата, время и длительность (по умолчанию 1 час с возможностью изменения) -->
+              <div class="form-row-4">
+                <div>
+                  <label for="lesson-date" class="field-label">Дата урока</label>
+                  <input id="lesson-date" type="date" class="field-input font-mono-tabular" required />
+                </div>
+                <div>
+                  <label for="lesson-start-time" class="field-label">Начало</label>
+                  <input id="lesson-start-time" type="time" class="field-input font-mono-tabular" required />
+                </div>
+                <div>
+                  <label for="lesson-duration-preset" class="field-label">Длительность</label>
+                  <select id="lesson-duration-preset" class="field-select">
+                    <option value="45">45 мин</option>
+                    <option value="60" selected>1 час (по умолч.)</option>
+                    <option value="90">1.5 часа (90 мин)</option>
+                    <option value="120">2 часа (120 мин)</option>
+                    <option value="custom">Свое время</option>
+                  </select>
+                </div>
+                <div>
+                  <label for="lesson-end-time" class="field-label">Окончание</label>
+                  <input id="lesson-end-time" type="time" class="field-input font-mono-tabular" required />
+                </div>
+              </div>
+
+              <div class="form-row-2">
+                <div>
+                  <label for="lesson-subject" class="field-label">Предмет</label>
+                  <select id="lesson-subject" class="field-select">
+                    <option value="eng">🇬🇧 Английский язык (ENG)</option>
+                    <option value="rus">🇷🇺 Русский язык (RUS)</option>
+                  </select>
+                </div>
+                <div>
+                  <label for="lesson-status" class="field-label">Статус урока</label>
+                  <select id="lesson-status" class="field-select">
+                    <option value="planned">Запланирован</option>
+                    <option value="completed">Проведен</option>
+                    <option value="cancelled">Отменен</option>
+                    <option value="rescheduled">Перенесен</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Автоматическое повторение урока каждую неделю до конца месяца -->
+              <div class="autosync-repeat-box" data-testid="autosync-repeat-section">
+                <label class="checkbox-label" style="font-size: 12.5px; font-weight: 600; color: #0f172a;">
+                  <input id="lesson-repeat-weekly" type="checkbox" checked />
+                  <span>🔄 Автоматически повторять каждую неделю до конца месяца</span>
+                </label>
+                <span id="lesson-repeat-hint" class="autosync-repeat-hint font-mono-tabular"></span>
+              </div>
+
+              <!-- Блок «Заметки для учителя» (переходящие на все последующие уроки ученика) -->
+              <div class="teacher-note-box" data-testid="teacher-notes-section">
+                <div class="teacher-note-header">
+                  <label for="lesson-teacher-note" style="font-size: 12px; font-weight: 700;">
+                    📌 Заметки для учителя (отображаются на всех последующих уроках)
+                  </label>
+                  <div style="display: flex; align-items: center; gap: 10px;">
+                    <label class="checkbox-label" style="font-size: 11.5px;">
+                      <input id="lesson-teacher-note-active" type="checkbox" checked />
+                      <span>Показывать на следующих уроках</span>
+                    </label>
+                    <button
+                      type="button"
+                      id="disable-teacher-note-btn"
+                      style="display: none; font-size: 11px; font-weight: 600; color: #e11d48; text-decoration: underline;"
+                    >
+                      Отключить / очистить
+                    </button>
+                  </div>
+                </div>
+                <textarea
+                  id="lesson-teacher-note"
+                  rows="2"
+                  class="field-textarea"
+                  placeholder="Запишите важное напоминание для себя (будет автоматически показываться на следующих уроках этого ученика, пока вы не отключите или не измените его)..."
+                ></textarea>
+              </div>
+
+              <!-- Блок «ДЗ с прошлого урока» (Умная подсказка) -->
+              <div data-testid="smart-previous-hw-banner" class="smart-hw-box">
+                <div class="smart-hw-header">
+                  <span>ДЗ с прошлого урока (умная подсказка)</span>
+                  <span id="smart-hw-date" class="font-mono-tabular"></span>
+                </div>
+                <div id="smart-hw-content"></div>
+              </div>
+
+              <div>
+                <label for="lesson-classwork" class="field-label">Классная работа (CW) / Тема урока</label>
+                <textarea
+                  id="lesson-classwork"
+                  rows="2"
+                  class="field-textarea"
+                  placeholder="Что разбирали на занятии: темы, упражнения, результаты..."
+                ></textarea>
+              </div>
+
+              <div>
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px;">
+                  <label for="lesson-homework" class="field-label" style="margin: 0;">Домашнее задание (HW) на следующий раз</label>
+                  <label class="checkbox-label">
+                    <input id="lesson-hw-checked" type="checkbox" />
+                    <span>ДЗ выполнено / проверено</span>
+                  </label>
+                </div>
+                <textarea
+                  id="lesson-homework"
+                  rows="2"
+                  class="field-textarea"
+                  placeholder="Укажите страницы учебника, упражнения или тему эссе..."
+                ></textarea>
+              </div>
+
+              <!-- Стоимость и статус оплаты конкретного урока -->
+              <div class="payment-box">
+                <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px;">
+                  <strong style="font-size: 12px;">Оплата и стоимость конкретного урока</strong>
+                  <label class="checkbox-label">
+                    <input id="lesson-is-paid" type="checkbox" />
+                    <span id="lesson-paid-status-text" class="text-unpaid">Не оплачено</span>
+                  </label>
+                </div>
+                <div class="form-row-2">
+                  <div>
+                    <label for="lesson-price" class="field-label">Стоимость урока (₽)</label>
+                    <input id="lesson-price" type="number" min="0" step="50" value="1500" class="field-input font-mono-tabular" required />
+                  </div>
+                  <div>
+                    <label for="lesson-payment-note" class="field-label">Примечание к оплате урока (необязательно)</label>
+                    <input id="lesson-payment-note" type="text" class="field-input" placeholder="Например: Абонемент (урок 2 из 4), СБП..." />
+                  </div>
+                </div>
+              </div>
+              <!-- Диалог подтверждения действий над серией будущих уроков в месяце -->
+              <div id="series-confirm-box" data-testid="series-confirm-box" class="series-confirm-box" style="display: none;">
+                <div id="series-confirm-message" class="series-confirm-message"></div>
+                <div class="series-confirm-actions">
+                  <button type="button" id="series-confirm-all-btn" class="btn-primary" style="padding: 6px 12px; font-size: 12px;">
+                    Применить ко всем будущим в месяце
+                  </button>
+                  <button type="button" id="series-confirm-single-btn" class="btn-secondary" style="padding: 6px 12px; font-size: 12px;">
+                    Только этот урок
+                  </button>
+                  <button type="button" id="series-confirm-cancel-btn" style="font-size: 12px; color: #64748b; text-decoration: underline;">
+                    Отмена
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div class="modal-footer">
+              <div>
+                <button
+                  type="button"
+                  id="delete-lesson-btn"
+                  style="display: none; color: #e11d48; font-size: 12px; font-weight: 600;"
+                >
+                  Удалить урок
+                </button>
+              </div>
+              <div style="display: flex; gap: 8px; margin-left: auto;">
+                <button type="button" class="btn-secondary" data-action="close-modal">Отмена</button>
+                <button type="submit" class="btn-primary">Сохранить</button>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Модальное окно 2: База учеников и История -->
+      <div id="students-modal" role="dialog" aria-modal="true" aria-labelledby="students-modal-title" class="modal-backdrop hidden">
+        <div class="modal-window modal-xl">
+          <div class="modal-header">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <button
+                type="button"
+                id="students-back-btn"
+                class="btn-secondary"
+                style="display: none; padding: 5px 10px; font-size: 12px;"
+                aria-label="Назад к списку учеников"
+              >
+                ← Назад
+              </button>
+              <div>
+                <h2 id="students-modal-title" class="modal-title">База учеников и История</h2>
+                <p id="students-modal-subtitle" class="modal-subtitle"></p>
+              </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <button type="button" id="students-open-add-btn" class="btn-primary" style="padding: 7px 12px; font-size: 12px;">
+                + Добавить ученика
+              </button>
+              <button type="button" class="modal-close-btn" data-action="close-modal" aria-label="Закрыть базу учеников">✕</button>
+            </div>
+          </div>
+
+          <div id="students-modal-body" class="modal-body"></div>
+        </div>
+      </div>
+
+      <!-- Модальное окно 3: Автоперенос расписания -->
+      <div id="autotransfer-modal" role="dialog" aria-modal="true" aria-labelledby="autotransfer-modal-title" class="modal-backdrop hidden">
+        <div class="modal-window modal-md">
+          <div class="modal-header">
+            <h2 id="autotransfer-modal-title" class="modal-title">Автоперенос расписания</h2>
+            <button type="button" class="modal-close-btn" data-action="close-modal" aria-label="Закрыть окно автопереноса">✕</button>
+          </div>
+
+          <div class="modal-body">
+            <p style="margin: 0; font-size: 12.5px; color: #475569;">
+              Копирует сетку уроков со сдвигом дат на <strong>+7 дней</strong>. Переносятся ученик, время, предмет и активные заметки для учителя. Поля классной работы, ДЗ и статус оплаты урока сбрасываются, а отмененные уроки и дубликаты времени пропускаются.
+            </p>
+
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <label id="transfer-card-prev" class="radio-card active">
+                <input id="transfer-radio-prev" type="radio" name="transfer-direction" checked />
+                <div>
+                  <div style="font-size: 12.5px; font-weight: 600;">С предыдущей недели на текущую открытую</div>
+                  <div id="transfer-range-prev" class="font-mono-tabular" style="font-size: 11.5px; color: #64748b;"></div>
+                </div>
+              </label>
+
+              <label id="transfer-card-next" class="radio-card">
+                <input id="transfer-radio-next" type="radio" name="transfer-direction" />
+                <div>
+                  <div style="font-size: 12.5px; font-weight: 600;">С текущей открытой недели на следующую</div>
+                  <div id="transfer-range-next" class="font-mono-tabular" style="font-size: 11.5px; color: #64748b;"></div>
+                </div>
+              </label>
+            </div>
+
+            <div class="subpanel-box">
+              <div style="display: flex; justify-content: space-between; font-size: 12px;">
+                <span>К переносу:</span>
+                <strong id="autotransfer-preview-count" data-testid="autotransfer-preview-count" class="font-mono-tabular">0 ур.</strong>
+              </div>
+              <div id="autotransfer-skipped-info" class="font-mono-tabular" style="font-size: 11px; color: #64748b;"></div>
+              <div id="autotransfer-preview-list" style="max-height: 150px; overflow-y: auto; border-top: 1px solid #e2e8f0; padding-top: 6px;"></div>
+            </div>
+          </div>
+
+          <div class="modal-footer">
+            <div style="display: flex; gap: 8px; margin-left: auto;">
+              <button type="button" class="btn-secondary" data-action="close-modal">Отмена</button>
+              <button type="button" id="confirm-autotransfer-btn" class="btn-primary">Перенести уроки</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="js/store.js" defer></script>
+    <script src="js/calendar.js" defer></script>
+    <script src="js/ui.js" defer></script>
+    <script src="js/app.js" defer></script>
   </body>
 </html>

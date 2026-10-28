@@ -96,10 +96,13 @@ jobs:
           }
           EOF
 
-            # 3. Создание папки android и синхронизация
+            # 3. Создание папки android, синхронизация и включение автоповорота экрана (fullSensor)
             npx cap add android
             npx cap sync android
             echo "sdk.dir=/usr/local/lib/android/sdk" > android/local.properties
+            if [ -f "android/app/src/main/AndroidManifest.xml" ]; then
+              sed -i 's/<activity/<activity android:screenOrientation="fullSensor"/' android/app/src/main/AndroidManifest.xml
+            fi
           fi
 
       - name: Prepare Signing Keystore (.jks)
