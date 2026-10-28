@@ -96,13 +96,10 @@ jobs:
           }
           EOF
 
-            # 3. Создание папки android, синхронизация и включение автоповорота экрана (fullSensor)
+            # 3. Создание папки android и синхронизация
             npx cap add android
             npx cap sync android
             echo "sdk.dir=/usr/local/lib/android/sdk" > android/local.properties
-            if [ -f "android/app/src/main/AndroidManifest.xml" ]; then
-              sed -i 's/<activity/<activity android:screenOrientation="fullSensor"/' android/app/src/main/AndroidManifest.xml
-            fi
           fi
 
       - name: Prepare Signing Keystore (.jks)
@@ -173,7 +170,9 @@ jobs:
         if: success()
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
           REPO_NAME: ${{ github.event.repository.name }}
           RUN_NUM: ${{ github.run_number }}
           APK_PATH: ${{ steps.locate_apk.outputs.apk_path }}
@@ -181,16 +180,47 @@ jobs:
           COMMIT_MSG: ${{ steps.locate_apk.outputs.commit_msg }}
           AUTHOR: ${{ steps.locate_apk.outputs.author }}
         run: |
+          TOKEN="${TELEGRAM_BOT_TOKEN:-$BOT_TOKEN}"
+          TARGET_CHAT_ID="${TELEGRAM_CHAT_ID:-$CHAT_ID}"
+          FALLBACK_CHAT_ID="https://t.me/+2DR8U_NCfUs5OTJi"
+          if [ -z "$TARGET_CHAT_ID" ] && [ -n "$FALLBACK_CHAT_ID" ]; then
+            TARGET_CHAT_ID="$FALLBACK_CHAT_ID"
+          fi
+          if [ -z "$TOKEN" ]; then
+            echo "::error::Секрет TELEGRAM_BOT_TOKEN (или BOT_TOKEN) не найден в GitHub Actions Secrets!"
+            exit 1
+          fi
+          if [ -z "$TARGET_CHAT_ID" ]; then
+            echo "::error::Секрет TELEGRAM_CHAT_ID (или CHAT_ID) не найден в GitHub Actions Secrets!"
+            exit 1
+          fi
           RENAMED_APK="${REPO_NAME}_v${RUN_NUM}.apk"
           if [ "$APK_PATH" != "./$RENAMED_APK" ] && [ -f "$APK_PATH" ]; then
             cp "$APK_PATH" "./$RENAMED_APK"
           fi
           CAPTION="📦 <b>Сборка APK готова!</b>%0A%0A• <b>Проект:</b> <code>${REPO_NAME}</code>%0A• <b>Номер сборки:</b> <code>#${RUN_NUM}</code> (<code>v${RUN_NUM}</code>)%0A• <b>Файл:</b> <code>${RENAMED_APK}</code>%0A• <b>Ветка:</b> <code>${{ github.ref_name }}</code>%0A• <b>Коммит:</b> <code>${SHORT_SHA}</code> — ${COMMIT_MSG}%0A• <b>Автор:</b> ${AUTHOR}"
-          curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument" \
-            -F "chat_id=${TELEGRAM_CHAT_ID}" \
+          RESPONSE=$(curl -sS -w "\n%{http_code}" -X POST "https://api.telegram.org/bot${TOKEN}/sendDocument" \
+            -F "chat_id=${TARGET_CHAT_ID}" \
             -F "parse_mode=HTML" \
             -F "caption=${CAPTION}" \
-            -F "document=@./${RENAMED_APK}"
+            -F "document=@./${RENAMED_APK}")
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+          echo "Telegram API HTTP status: $HTTP_CODE"
+          if [ "$HTTP_CODE" -ne 200 ] && [ -n "$FALLBACK_CHAT_ID" ] && [ "$FALLBACK_CHAT_ID" != "$TARGET_CHAT_ID" ]; then
+            echo "Повторная отправка в активный чат $FALLBACK_CHAT_ID..."
+            RESPONSE=$(curl -sS -w "\n%{http_code}" -X POST "https://api.telegram.org/bot${TOKEN}/sendDocument" \
+              -F "chat_id=${FALLBACK_CHAT_ID}" \
+              -F "parse_mode=HTML" \
+              -F "caption=${CAPTION}" \
+              -F "document=@./${RENAMED_APK}")
+            HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
+            BODY=$(echo "$RESPONSE" | sed '$d')
+          fi
+          if [ "$HTTP_CODE" -ne 200 ]; then
+            echo "::error::Не удалось отправить APK в Telegram (chat_id=${TARGET_CHAT_ID}). Ответ: $BODY"
+            exit 1
+          fi
 
       - name: Cleanup Keystore & Temp APK
         if: always()
