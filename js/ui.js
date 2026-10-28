@@ -394,32 +394,6 @@
             lesson.endTime
           );
           var hasCW = Boolean(lesson.classwork && lesson.classwork.trim());
-          var hasHW = Boolean(lesson.homework && lesson.homework.trim());
-
-          var resolvedTeacherNote = Calendar.resolveActiveTeacherNote(
-            state.students,
-            state.lessons,
-            lesson.studentId,
-            lesson.date
-          );
-
-          var calloutText = '';
-          if (hasHW) {
-            calloutText = 'Д/з: ' + lesson.homework.trim();
-            if (
-              resolvedTeacherNote.active &&
-              resolvedTeacherNote.text &&
-              !isCancelled
-            ) {
-              calloutText += ' · ' + resolvedTeacherNote.text.trim();
-            }
-          } else if (
-            resolvedTeacherNote.active &&
-            resolvedTeacherNote.text &&
-            !isCancelled
-          ) {
-            calloutText = 'Д/з: ' + resolvedTeacherNote.text.trim();
-          }
 
           var payBtnClass = lesson.isPaid ? 'paid' : 'unpaid';
           var payBtnText = lesson.isPaid ? 'Оплачено' : 'Не оплачено';
@@ -467,16 +441,6 @@
               ? '<p class="lesson-topic">' +
                 escapeHtml(lesson.classwork) +
                 '</p>'
-              : '') +
-            (calloutText
-              ? '<div class="lesson-note-callout">' +
-                '<span class="callout-pin" aria-hidden="true">' +
-                ICONS.pin +
-                '</span>' +
-                '<span class="callout-text">' +
-                escapeHtml(calloutText) +
-                '</span>' +
-                '</div>'
               : '') +
             '</button>' +
             '<div class="lesson-footer">' +

@@ -190,21 +190,6 @@ export const WeekGrid: React.FC<WeekGridProps> = ({
                             {hasClasswork && (
                               <p className="lesson-topic">{lesson.classwork}</p>
                             )}
-
-                            {hasHomework && (
-                              <div className="lesson-note-callout">
-                                <span className="callout-pin" aria-hidden="true">
-                                  <svg
-                                    className="pin-svg"
-                                    viewBox="0 0 24 24"
-                                    fill="currentColor"
-                                  >
-                                    <path d="M16 3a1 1 0 0 1 .7.29l4 4a1 1 0 0 1-.26 1.62l-3.2 1.28-2.66 2.66 1.13 4.52a1 1 0 0 1-1.68.95L10.3 14.6l-4.6 4.6a1 1 0 0 1-1.4-1.4l4.6-4.6-3.71-3.73a1 1 0 0 1 .95-1.68l4.52 1.13 2.66-2.66 1.28-3.2A1 1 0 0 1 16 3z" />
-                                  </svg>
-                                </span>
-                                <span className="callout-text">Д/з: {lesson.homework}</span>
-                              </div>
-                            )}
                           </button>
 
                           {/* Footer Row */}
