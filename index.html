@@ -14,188 +14,342 @@
   </head>
   <body>
     <div class="app-shell">
-      <!-- Шапка и панель управления -->
+      <!-- Темно-синяя шапка приложения как на рендере -->
       <div class="header-wrapper">
         <header class="container-wide top-bar">
-          <a href="#schedule" id="brand-home-link" class="brand-link">Планер репетитора</a>
+          <div class="brand-lockup">
+            <div class="brand-icon-badge" aria-hidden="true">
+              <svg viewBox="0 0 36 36" fill="none" class="brand-logo-svg">
+                <rect x="4" y="6" width="28" height="25" rx="5" fill="#E8EEF7" />
+                <path d="M4 11C4 8.23858 6.23858 6 9 6H27C29.7614 6 32 8.23858 32 11V12H4V11Z" fill="#94A8C4" />
+                <rect x="10" y="3" width="3" height="6" rx="1.5" fill="#CBD5E1" />
+                <rect x="23" y="3" width="3" height="6" rx="1.5" fill="#CBD5E1" />
+                <path d="M18 15L10 19L18 23L26 19L18 15Z" fill="#233858" />
+                <path d="M13 21.2V25.2C13 26.5 15.2 27.8 18 27.8C20.8 27.8 23 26.5 23 25.2V21.2L18 23.7L13 21.2Z" fill="#233858" />
+                <path d="M25.2 19.5V24.8" stroke="#233858" stroke-width="1.6" stroke-linecap="round" />
+              </svg>
+            </div>
+            <div class="brand-titles">
+              <a href="#schedule" id="brand-home-link" class="brand-link">Планер репетитора</a>
+              <div class="brand-sub-nav" aria-label="Быстрые разделы">
+                <button type="button" class="brand-sub-link" data-nav-action="planner">Уроки</button>
+                <span class="brand-sub-dot" aria-hidden="true">•</span>
+                <button type="button" class="brand-sub-link" data-nav-action="students">Ученики</button>
+                <span class="brand-sub-dot" aria-hidden="true">•</span>
+                <button type="button" class="brand-sub-link" data-nav-action="stats">Результаты</button>
+              </div>
+            </div>
+          </div>
 
-          <nav aria-label="Основная навигация" class="top-nav">
-            <button type="button" id="open-students-btn" class="nav-action-btn">
-              <span>База учеников (<span id="students-count-badge">4</span>)</span>
-            </button>
-            <span
-              id="autosync-status-indicator"
-              data-testid="autosync-status-indicator"
-              class="autosync-status-indicator"
-              title="Новые уроки автоматически повторяются каждую неделю до конца текущего месяца, а в последний день месяца расписание автоматически переносится на следующий месяц"
+          <div class="header-right-actions">
+            <button
+              type="button"
+              id="header-search-toggle-btn"
+              class="header-icon-btn"
+              aria-label="Фильтры и поиск по дате или предмету"
+              title="Фильтры и поиск"
             >
-              <span class="autosync-dot" aria-hidden="true"></span>
-              <span id="autosync-status-text">Автозаполнение до конца месяца: активно</span>
-            </span>
-            <button type="button" id="export-json-btn" class="nav-action-btn">
-              <span>Экспорт базы (JSON)</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" class="header-action-svg">
+                <circle cx="11" cy="11" r="7" />
+                <line x1="16.5" y1="16.5" x2="21" y2="21" stroke-linecap="round" />
+              </svg>
             </button>
-            <button type="button" id="import-json-btn" class="nav-action-btn">
-              <span>Импорт базы (JSON)</span>
-            </button>
-            <input
-              id="import-json-input"
-              type="file"
-              accept=".json,application/json"
-              style="display: none;"
-              aria-label="Импорт базы (JSON)"
-            />
-          </nav>
-
-          <div>
-            <button type="button" id="header-add-lesson-btn" class="btn-primary">
-              <span>+ Добавить урок</span>
+            <button
+              type="button"
+              id="header-menu-toggle-btn"
+              class="header-icon-btn"
+              aria-label="Дополнительные настройки и импорт/экспорт"
+              title="Настройки, вид расписания и резервная копия"
+            >
+              <svg viewBox="0 0 24 24" fill="currentColor" class="header-action-svg">
+                <circle cx="12" cy="5" r="2" />
+                <circle cx="12" cy="12" r="2" />
+                <circle cx="12" cy="19" r="2" />
+              </svg>
             </button>
           </div>
         </header>
+      </div>
 
-        <!-- Панель навигации по неделям и фильтров -->
-        <div class="container-wide toolbar">
-          <div class="toolbar-group">
-            <div class="segmented-group">
-              <button type="button" id="btn-prev-week" class="segmented-btn" aria-label="Предыдущая неделя">
-                ‹ Пред. неделя
-              </button>
-              <button type="button" id="btn-today-week" class="segmented-btn" style="font-weight: 600;">
+      <!-- Основное светлое полотно со скругленными верхними углами -->
+      <div class="planner-sheet">
+        <div class="container-wide">
+          <!-- Полоса переключения недель -->
+          <div class="week-nav-bar">
+            <button type="button" id="btn-prev-week" class="week-arrow-btn" aria-label="Предыдущая неделя">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" class="week-arrow-svg">
+                <polyline points="15 18 9 12 15 6" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </button>
+
+            <div class="week-range-center">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="week-cal-svg" aria-hidden="true">
+                <rect x="3" y="4" width="18" height="18" rx="3" />
+                <line x1="16" y1="2" x2="16" y2="6" stroke-linecap="round" />
+                <line x1="8" y1="2" x2="8" y2="6" stroke-linecap="round" />
+                <line x1="3" y1="10" x2="21" y2="10" />
+              </svg>
+              <div id="week-range-label" data-testid="week-range-label" class="week-range-label font-mono-tabular">
+                26 окт – 1 ноя 2026
+              </div>
+              <button type="button" id="btn-today-week" class="week-today-chip" title="Вернуться на текущую неделю">
                 Сегодня
               </button>
-              <button type="button" id="btn-next-week" class="segmented-btn" aria-label="Следующая неделя">
-                След. неделя ›
-              </button>
             </div>
 
-            <div id="week-range-label" data-testid="week-range-label" class="week-range-label font-mono-tabular">
-              26 окт – 1 ноя 2026
-            </div>
+            <button type="button" id="btn-next-week" class="week-arrow-btn" aria-label="Следующая неделя">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" class="week-arrow-svg">
+                <polyline points="9 18 15 12 9 6" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </button>
           </div>
 
-          <div class="toolbar-group">
-            <div role="group" aria-label="Расположение дней недели" class="segmented-group">
-              <button type="button" id="layout-mode-board" class="segmented-btn active" title="Как в дневнике: слева Пн–Ср, справа Чт–Сб">
-                Дневник (Пн–Ср | Чт–Сб)
-              </button>
-              <button type="button" id="layout-mode-rows" class="segmented-btn" title="Дни недели одним списком сверху вниз">
-                Список по дням
-              </button>
-            </div>
+          <!-- Полоса быстрого выбора дня недели (Пн – Вс) -->
+          <section aria-label="Дни недели" class="week-day-strip-section">
+            <div id="week-day-tabs-container" class="week-day-tabs"></div>
+          </section>
 
-            <div role="group" aria-label="Фильтр по предметам" class="segmented-group">
-              <button type="button" id="filter-subj-all" class="segmented-btn active">Все</button>
-              <button type="button" id="filter-subj-eng" class="segmented-btn">🇬🇧 Английский</button>
-              <button type="button" id="filter-subj-rus" class="segmented-btn">🇷🇺 Русский</button>
-            </div>
+          <!-- Панель быстрых действий (Все ученики, Автозаполнение, Экспорт JSON, + Добавить урок) -->
+          <div class="action-pills-bar">
+            <div class="action-pills-left">
+              <button type="button" id="open-students-btn" class="pill-btn pill-btn-students">
+                <svg viewBox="0 0 24 24" fill="currentColor" class="pill-icon-svg" aria-hidden="true">
+                  <path d="M12 12c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm0 2c-3.33 0-10 1.67-10 5v2h20v-2c0-3.33-6.67-5-10-5z" />
+                </svg>
+                <span>Все ученики (<span id="students-count-badge">4</span>)</span>
+              </button>
 
-            <div class="date-filter-box">
-              <label for="exact-date-filter">Дата:</label>
-              <input
-                id="exact-date-filter"
-                type="date"
-                aria-label="Фильтр по дате"
-                class="date-filter-input font-mono-tabular"
-              />
-              <button
-                type="button"
-                id="clear-date-filter-btn"
-                aria-label="Сбросить фильтр даты"
-                style="display: none; font-weight: 700; color: #475569;"
+              <span
+                id="autosync-status-indicator"
+                data-testid="autosync-status-indicator"
+                class="pill-badge-autosync"
+                title="Новые уроки автоматически повторяются каждую неделю до конца текущего месяца, а в последний день месяца расписание автоматически переносится на следующий месяц"
               >
-                ✕
+                <span class="autosync-dot" aria-hidden="true"></span>
+                <span id="autosync-status-text">Автозаполнение до конца месяца</span>
+              </span>
+            </div>
+
+            <div class="action-pills-right">
+              <button type="button" id="export-json-btn" class="pill-btn pill-btn-export">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="pill-icon-svg" aria-hidden="true">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke-linecap="round" stroke-linejoin="round" />
+                  <polyline points="17 8 12 3 7 8" stroke-linecap="round" stroke-linejoin="round" />
+                  <line x1="12" y1="3" x2="12" y2="15" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+                <span>Экспорт (JSON)</span>
+              </button>
+
+              <button type="button" id="import-json-btn" class="pill-btn pill-btn-import" title="Импортировать базу из JSON">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="pill-icon-svg" aria-hidden="true">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke-linecap="round" stroke-linejoin="round" />
+                  <polyline points="7 10 12 15 17 10" stroke-linecap="round" stroke-linejoin="round" />
+                  <line x1="12" y1="15" x2="12" y2="3" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+                <span>Импорт</span>
+              </button>
+
+              <input
+                id="import-json-input"
+                type="file"
+                accept=".json,application/json"
+                style="display: none;"
+                aria-label="Импорт базы (JSON)"
+              />
+
+              <button type="button" id="header-add-lesson-btn" class="pill-btn pill-btn-add">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="pill-icon-svg" aria-hidden="true">
+                  <line x1="12" y1="5" x2="12" y2="19" stroke-linecap="round" />
+                  <line x1="5" y1="12" x2="19" y2="12" stroke-linecap="round" />
+                </svg>
+                <span>Добавить урок</span>
               </button>
             </div>
           </div>
 
-          <!-- Мобильная панель быстрых действий -->
-          <div class="mobile-actions-bar">
-            <button type="button" id="open-students-btn-mobile" class="mobile-util-btn">
-              База учеников (<span id="students-count-badge-mobile">4</span>)
-            </button>
-            <span id="autosync-status-indicator-mobile" class="autosync-status-mobile">
-              <span class="autosync-dot" aria-hidden="true"></span>
-              <span id="autosync-status-text-mobile">Автозаполнение: активно</span>
-            </span>
-            <button type="button" id="export-json-btn-mobile" class="mobile-util-btn">
-              Экспорт JSON
-            </button>
-            <button type="button" id="import-json-btn-mobile" class="mobile-util-btn">
-              Импорт JSON
-            </button>
-          </div>
-        </div>
-      </div>
+          <!-- Выдвижная панель фильтров, вида расписания и даты (открывается по иконкам поиска/меню/настроек) -->
+          <div id="toolbar-settings-drawer" class="toolbar-drawer">
+            <div class="toolbar-group">
+              <div role="group" aria-label="Расположение дней недели" class="segmented-group">
+                <button type="button" id="layout-mode-board" class="segmented-btn active" title="Как в дневнике: слева Пн–Ср, справа Чт–Сб">
+                  Дневник (Пн–Ср | Чт–Сб)
+                </button>
+                <button type="button" id="layout-mode-rows" class="segmented-btn" title="Дни недели одним списком сверху вниз">
+                  Список по дням
+                </button>
+              </div>
 
-      <!-- Уведомления -->
-      <div id="notice-container" class="container-wide" style="display: none;">
-        <div id="notice-banner" role="status" class="notice-banner">
-          <span id="notice-text"></span>
-          <button type="button" id="notice-close-btn" style="text-decoration: underline;">Скрыть</button>
-        </div>
-      </div>
+              <div role="group" aria-label="Фильтр по предметам" class="segmented-group">
+                <button type="button" id="filter-subj-all" class="segmented-btn active">Все</button>
+                <button type="button" id="filter-subj-eng" class="segmented-btn">🇬🇧 Английский</button>
+                <button type="button" id="filter-subj-rus" class="segmented-btn">🇷🇺 Русский</button>
+              </div>
 
-      <!-- Сводка за выбранную неделю (Dashboard-полоса) -->
-      <section aria-label="Сводка за выбранную неделю" class="container-wide dashboard-section">
-        <div class="dashboard-card">
-          <div class="dashboard-metrics-left">
-            <div>
-              <span class="metric-label">Всего уроков на неделе</span>
-              <div class="metric-value-row font-mono-tabular">
-                <span id="dashboard-total-lessons" data-testid="dashboard-total-lessons" class="metric-big-num">7</span>
-                <span style="font-size: 12px; color: #475569;">
-                  Англ: <strong id="dashboard-eng-lessons" class="text-eng">3</strong>
-                  ·
-                  Рус: <strong id="dashboard-rus-lessons" class="text-rus">4</strong>
-                </span>
+              <div class="date-filter-box">
+                <label for="exact-date-filter">Дата:</label>
+                <input
+                  id="exact-date-filter"
+                  type="date"
+                  aria-label="Фильтр по дате"
+                  class="date-filter-input font-mono-tabular"
+                />
+                <button
+                  type="button"
+                  id="clear-date-filter-btn"
+                  aria-label="Сбросить фильтр даты"
+                  style="display: none; font-weight: 700; color: #475569;"
+                >
+                  ✕
+                </button>
               </div>
             </div>
 
-            <div class="metric-divider" aria-hidden="true"></div>
-
-            <div>
-              <span class="metric-label">Статус проведения</span>
-              <div id="dashboard-completed-text" class="font-mono-tabular" style="font-size: 12px; margin-top: 4px; color: #334155;">
-                Проведено: 3 из 7
-              </div>
-            </div>
-
-            <div id="dashboard-active-filter" style="display: none; align-items: center; gap: 8px; font-size: 12px;">
-              <span>Фильтр: <strong id="dashboard-filter-text"></strong></span>
-              <button type="button" id="dashboard-clear-filters" style="color: #1d4ed8; text-decoration: underline; font-weight: 600;">
-                Сбросить
+            <!-- Совместимость мобильных контролов -->
+            <div class="mobile-actions-bar" style="display: none;">
+              <button type="button" id="open-students-btn-mobile" class="mobile-util-btn">
+                База учеников (<span id="students-count-badge-mobile">4</span>)
+              </button>
+              <span id="autosync-status-indicator-mobile" class="autosync-status-mobile">
+                <span class="autosync-dot" aria-hidden="true"></span>
+                <span id="autosync-status-text-mobile">Автозаполнение до конца месяца</span>
+              </span>
+              <button type="button" id="export-json-btn-mobile" class="mobile-util-btn">
+                Экспорт JSON
+              </button>
+              <button type="button" id="import-json-btn-mobile" class="mobile-util-btn">
+                Импорт JSON
               </button>
             </div>
           </div>
 
-          <div>
-            <span class="metric-label">Статус оплаты уроков на неделе</span>
-            <div class="finance-row font-mono-tabular">
-              <span id="dashboard-paid-amount" data-testid="dashboard-paid-amount" class="text-paid">Оплачено уроков: 0</span>
-              <span style="color: #cbd5e1;">|</span>
-              <span id="dashboard-unpaid-amount" data-testid="dashboard-unpaid-amount" class="text-unpaid">Не оплачено уроков: 0</span>
+          <!-- Уведомления -->
+          <div id="notice-container" style="display: none;">
+            <div id="notice-banner" role="status" class="notice-banner">
+              <span id="notice-text"></span>
+              <button type="button" id="notice-close-btn" style="text-decoration: underline;">Скрыть</button>
             </div>
           </div>
+
+          <!-- 4 карточки сводки за неделю (как на рендере) -->
+          <section id="stats-dashboard-section" aria-label="Сводка за выбранную неделю" class="dashboard-section">
+            <div class="kpi-cards-grid">
+              <!-- Карточка 1: Всего уроков на неделю -->
+              <div class="kpi-stat-card">
+                <div class="kpi-icon-circle kpi-icon-slate" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="currentColor" class="kpi-svg">
+                    <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z" />
+                  </svg>
+                </div>
+                <div class="kpi-card-content">
+                  <span class="kpi-card-label">Всего уроков<br />на неделю</span>
+                  <div class="kpi-card-value-row font-mono-tabular">
+                    <span id="dashboard-total-lessons" data-testid="dashboard-total-lessons" class="kpi-big-number kpi-color-dark">7</span>
+                    <span class="kpi-inline-sub">
+                      ENG: <strong id="dashboard-eng-lessons">3</strong> · RUS: <strong id="dashboard-rus-lessons">4</strong>
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Карточка 2: Проведено -->
+              <div class="kpi-stat-card">
+                <div class="kpi-icon-circle kpi-icon-green" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" class="kpi-svg">
+                    <polyline points="20 6 9 17 4 12" stroke-linecap="round" stroke-linejoin="round" />
+                  </svg>
+                </div>
+                <div class="kpi-card-content">
+                  <span class="kpi-card-label">Проведено</span>
+                  <div class="kpi-card-value-row font-mono-tabular">
+                    <span id="dashboard-completed-count" class="kpi-big-number kpi-color-green">3</span>
+                  </div>
+                  <div id="dashboard-completed-text" class="kpi-micro-note font-mono-tabular" style="display: none;"></div>
+                  <div id="dashboard-paid-amount" data-testid="dashboard-paid-amount" class="kpi-micro-note text-paid font-mono-tabular"></div>
+                </div>
+              </div>
+
+              <!-- Карточка 3: Запланировано -->
+              <div class="kpi-stat-card">
+                <div class="kpi-icon-circle kpi-icon-blue" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" class="kpi-svg">
+                    <circle cx="12" cy="12" r="9" />
+                    <polyline points="12 7 12 12 15.5 14" stroke-linecap="round" stroke-linejoin="round" />
+                  </svg>
+                </div>
+                <div class="kpi-card-content">
+                  <span class="kpi-card-label">Запланировано</span>
+                  <div class="kpi-card-value-row font-mono-tabular">
+                    <span id="dashboard-planned-count" class="kpi-big-number kpi-color-blue">1</span>
+                  </div>
+                  <div id="dashboard-active-filter" class="kpi-micro-note" style="display: none; align-items: center; gap: 6px;">
+                    <span>Фильтр: <strong id="dashboard-filter-text"></strong></span>
+                    <button type="button" id="dashboard-clear-filters" class="kpi-reset-btn">Сбросить</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Карточка 4: Не оплачено -->
+              <div class="kpi-stat-card">
+                <div class="kpi-icon-circle kpi-icon-red" aria-hidden="true">
+                  <span class="kpi-exclamation">!</span>
+                </div>
+                <div class="kpi-card-content">
+                  <span class="kpi-card-label kpi-label-red">Не оплачено</span>
+                  <div class="kpi-card-value-row font-mono-tabular">
+                    <span id="dashboard-unpaid-count" class="kpi-big-number kpi-color-red">3</span>
+                  </div>
+                  <div id="dashboard-unpaid-amount" data-testid="dashboard-unpaid-amount" class="kpi-micro-note text-unpaid font-mono-tabular"></div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Сетка расписания по дням недели (Дневник: Пн–Ср слева, Чт–Сб справа, Вс внизу) -->
+          <main id="schedule" class="schedule-main">
+            <div id="week-grid-container" class="week-grid layout-board"></div>
+          </main>
         </div>
-      </section>
+      </div>
 
-      <!-- Панель быстрого выбора дня недели (Пн – Вс) -->
-      <section aria-label="Дни недели" class="container-wide week-day-strip-section">
-        <div class="week-day-strip-bar">
-          <div id="week-day-tabs-container" class="week-day-tabs"></div>
+      <!-- Нижняя панель навигации как на рендере -->
+      <nav aria-label="Нижняя навигация" class="bottom-tab-bar">
+        <div class="container-wide bottom-tab-inner">
+          <button type="button" class="bottom-tab-item active" data-bottom-nav="planner">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="bottom-tab-svg">
+              <rect x="3" y="4" width="18" height="18" rx="3" />
+              <line x1="16" y1="2" x2="16" y2="6" stroke-linecap="round" />
+              <line x1="8" y1="2" x2="8" y2="6" stroke-linecap="round" />
+              <line x1="3" y1="10" x2="21" y2="10" />
+            </svg>
+            <span>Планер</span>
+          </button>
+
+          <button type="button" class="bottom-tab-item" data-bottom-nav="students">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="bottom-tab-svg">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" stroke-linecap="round" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
+            <span>Ученики</span>
+          </button>
+
+          <button type="button" class="bottom-tab-item" data-bottom-nav="stats">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" class="bottom-tab-svg">
+              <line x1="6" y1="20" x2="6" y2="14" stroke-linecap="round" />
+              <line x1="12" y1="20" x2="12" y2="4" stroke-linecap="round" />
+              <line x1="18" y1="20" x2="18" y2="10" stroke-linecap="round" />
+            </svg>
+            <span>Статистика</span>
+          </button>
+
+          <button type="button" class="bottom-tab-item" data-bottom-nav="settings">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="bottom-tab-svg">
+              <circle cx="12" cy="12" r="3" />
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+            </svg>
+            <span>Настройки</span>
+          </button>
         </div>
-      </section>
-
-      <!-- Сетка расписания по дням недели -->
-      <main class="container-wide schedule-main">
-        <div id="week-grid-container" class="week-grid layout-board"></div>
-      </main>
-
-      <footer class="container-wide app-footer">
-        <span>Планер репетитора · Английский (ENG) и Русский (RUS) языки</span>
-        <span>Все данные автоматически сохраняются локально (localStorage)</span>
-      </footer>
+      </nav>
 
       <!-- Модальное окно 1: Создание / Редактирование урока -->
       <div id="lesson-modal" role="dialog" aria-modal="true" aria-labelledby="lesson-modal-title" class="modal-backdrop hidden">
@@ -398,6 +552,7 @@
                   </div>
                 </div>
               </div>
+
               <!-- Диалог подтверждения действий над серией будущих уроков в месяце -->
               <div id="series-confirm-box" data-testid="series-confirm-box" class="series-confirm-box" style="display: none;">
                 <div id="series-confirm-message" class="series-confirm-message"></div>

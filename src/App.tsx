@@ -33,6 +33,10 @@ export default function App() {
 
   const [subjectFilter, setSubjectFilter] = useState<SubjectFilter>('all');
   const [exactDateFilter, setExactDateFilter] = useState<string>('');
+  const [weekLayoutMode, setWeekLayoutMode] = useState<'board' | 'rows'>('board');
+  const [activeBottomTab, setActiveBottomTab] = useState<
+    'planner' | 'students' | 'stats' | 'settings'
+  >('planner');
 
   // Modal states
   const [isLessonModalOpen, setIsLessonModalOpen] = useState<boolean>(false);
@@ -107,6 +111,7 @@ export default function App() {
   const handleToday = () => {
     setExactDateFilter('');
     setCurrentMondayISO(getMondayOfWeek(todayISO));
+    setActiveBottomTab('planner');
   };
 
   const handleExactDateChange = (dateStr: string) => {
@@ -239,9 +244,10 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900">
+    <div className="app-shell">
       <Header
         weekRangeLabel={weekRangeLabel}
+        weekDays={weekDays}
         onPrevWeek={handlePrevWeek}
         onToday={handleToday}
         onNextWeek={handleNextWeek}
@@ -255,23 +261,21 @@ export default function App() {
         onExportJSON={handleExportJSON}
         onImportJSONFile={handleImportJSONFile}
         studentsCount={students.length}
+        weekLayoutMode={weekLayoutMode}
+        onWeekLayoutModeChange={setWeekLayoutMode}
       />
 
       {notice && (
-        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 pt-3 w-full">
+        <div className="container-wide">
           <div
             role="status"
-            className={`px-4 py-2.5 rounded-lg border text-xs font-medium flex items-center justify-between ${
-              notice.type === 'error'
-                ? 'bg-rose-50 border-rose-200 text-rose-800'
-                : 'bg-emerald-50 border-emerald-200 text-emerald-900'
-            }`}
+            className={`notice-banner${notice.type === 'error' ? ' error' : ''}`}
           >
             <span>{notice.text}</span>
             <button
               type="button"
               onClick={() => setNotice(null)}
-              className="text-xs underline ml-4 cursor-pointer"
+              className="notice-close-link"
             >
               Скрыть
             </button>
@@ -289,23 +293,109 @@ export default function App() {
         }}
       />
 
-      <div className="flex-1">
-        <WeekGrid
-          weekDays={weekDays}
-          lessons={lessons}
-          studentsMap={studentsMap}
-          subjectFilter={subjectFilter}
-          exactDateFilter={exactDateFilter}
-          onAddLessonOnDate={handleOpenAddLessonOnDate}
-          onSelectLesson={handleOpenSelectLesson}
-          onQuickTogglePaid={handleQuickTogglePaid}
-        />
-      </div>
+      <WeekGrid
+        weekDays={weekDays}
+        lessons={lessons}
+        studentsMap={studentsMap}
+        subjectFilter={subjectFilter}
+        exactDateFilter={exactDateFilter}
+        onAddLessonOnDate={handleOpenAddLessonOnDate}
+        onSelectLesson={handleOpenSelectLesson}
+        onQuickTogglePaid={handleQuickTogglePaid}
+        weekLayoutMode={weekLayoutMode}
+      />
 
-      <footer className="max-w-[1440px] w-full mx-auto px-4 sm:px-6 py-4 border-t border-slate-200/80 mt-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-500">
-        <span>Планер репетитора · Английский (ENG) и Русский (RUS) языки</span>
-        <span>Все данные автоматически сохраняются локально в браузере (localStorage)</span>
-      </footer>
+      {/* Нижняя панель навигации как на рендере */}
+      <nav aria-label="Нижняя навигация" className="bottom-tab-bar">
+        <div className="container-wide bottom-tab-inner">
+          <button
+            type="button"
+            className={`bottom-tab-item${activeBottomTab === 'planner' ? ' active' : ''}`}
+            onClick={() => {
+              setActiveBottomTab('planner');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              className="bottom-tab-svg"
+            >
+              <rect x="3" y="4" width="18" height="18" rx="3" />
+              <line x1="16" y1="2" x2="16" y2="6" strokeLinecap="round" />
+              <line x1="8" y1="2" x2="8" y2="6" strokeLinecap="round" />
+              <line x1="3" y1="10" x2="21" y2="10" />
+            </svg>
+            <span>Планер</span>
+          </button>
+
+          <button
+            type="button"
+            className={`bottom-tab-item${activeBottomTab === 'students' ? ' active' : ''}`}
+            onClick={() => {
+              setActiveBottomTab('students');
+              setIsStudentsModalOpen(true);
+            }}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              className="bottom-tab-svg"
+            >
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" strokeLinecap="round" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
+            <span>Ученики</span>
+          </button>
+
+          <button
+            type="button"
+            className={`bottom-tab-item${activeBottomTab === 'stats' ? ' active' : ''}`}
+            onClick={() => {
+              setActiveBottomTab('stats');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              className="bottom-tab-svg"
+            >
+              <line x1="6" y1="20" x2="6" y2="14" strokeLinecap="round" />
+              <line x1="12" y1="20" x2="12" y2="4" strokeLinecap="round" />
+              <line x1="18" y1="20" x2="18" y2="10" strokeLinecap="round" />
+            </svg>
+            <span>Статистика</span>
+          </button>
+
+          <button
+            type="button"
+            className={`bottom-tab-item${activeBottomTab === 'settings' ? ' active' : ''}`}
+            onClick={() => {
+              setActiveBottomTab('settings');
+              setIsAutoTransferModalOpen(true);
+            }}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              className="bottom-tab-svg"
+            >
+              <circle cx="12" cy="12" r="3" />
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+            </svg>
+            <span>Настройки</span>
+          </button>
+        </div>
+      </nav>
 
       <LessonModal
         isOpen={isLessonModalOpen}

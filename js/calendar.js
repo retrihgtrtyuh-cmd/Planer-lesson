@@ -365,6 +365,7 @@
     var engLessons = 0;
     var rusLessons = 0;
     var completedLessons = 0;
+    var plannedLessons = 0;
     var cancelledLessons = 0;
     var paidLessonsCount = 0;
     var paidAmount = 0;
@@ -388,6 +389,8 @@
 
       if (isPastOrDone) {
         completedLessons += 1;
+      } else {
+        plannedLessons += 1;
       }
 
       var lessonPrice =
@@ -409,6 +412,7 @@
       engLessons: engLessons,
       rusLessons: rusLessons,
       completedLessons: completedLessons,
+      plannedLessons: plannedLessons,
       cancelledLessons: cancelledLessons,
       paidLessonsCount: paidLessonsCount,
       paidAmount: paidAmount,

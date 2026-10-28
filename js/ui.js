@@ -24,19 +24,28 @@
     return minutes + ' мин';
   }
 
+  function formatLessonsPlural(count) {
+    var n = Math.abs(Number(count) || 0) % 100;
+    var n1 = n % 10;
+    if (n > 10 && n < 20) return count + ' уроков';
+    if (n1 > 1 && n1 < 5) return count + ' урока';
+    if (n1 === 1) return count + ' урок';
+    return count + ' уроков';
+  }
+
   var ICONS = {
     clock:
-      '<svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
+      '<svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     book:
-      '<svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>',
+      '<svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 9h8M8 13h5" stroke-linecap="round"/></svg>',
     checkSquare:
-      '<svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>',
+      '<svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M21 12a9 9 0 1 1-2.64-6.36" stroke-linecap="round"/><polyline points="21 3 21 9 15 9" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     card:
-      '<svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>',
+      '<svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     alert:
-      '<svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
+      '<svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="12.5" stroke-linecap="round"/><circle cx="12" cy="16" r="0.8" fill="currentColor"/></svg>',
     plus:
-      '<svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>',
+      '<svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><line x1="12" y1="5" x2="12" y2="19" stroke-linecap="round"/><line x1="5" y1="12" x2="19" y2="12" stroke-linecap="round"/></svg>',
     edit:
       '<svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>',
     trash:
@@ -44,7 +53,11 @@
     history:
       '<svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>',
     refresh:
-      '<svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>',
+      '<svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><polyline points="17 2 21 6 17 10" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 11V9a4 4 0 0 1 4-4h14" stroke-linecap="round"/><polyline points="7 22 3 18 7 14" stroke-linecap="round" stroke-linejoin="round"/><path d="M21 13v2a4 4 0 0 1-4 4H3" stroke-linecap="round"/></svg>',
+    calendarEmpty:
+      '<svg class="empty-cal-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="18" height="17" rx="3"/><line x1="16" y1="2.5" x2="16" y2="6" stroke-linecap="round"/><line x1="8" y1="2.5" x2="8" y2="6" stroke-linecap="round"/><line x1="3" y1="9.5" x2="21" y2="9.5"/></svg>',
+    pin:
+      '<svg class="pin-svg" viewBox="0 0 24 24" fill="currentColor"><path d="M16 3a1 1 0 0 1 .7.29l4 4a1 1 0 0 1-.26 1.62l-3.2 1.28-2.66 2.66 1.13 4.52a1 1 0 0 1-1.68.95L10.3 14.6l-4.6 4.6a1 1 0 0 1-1.4-1.4l4.6-4.6-3.71-3.73a1 1 0 0 1 .95-1.68l4.52 1.13 2.66-2.66 1.28-3.2A1 1 0 0 1 16 3z"/></svg>',
   };
 
   function renderColorPresetsHtml(selectedColor, targetInputId) {
@@ -85,6 +98,9 @@
     var totalEl = document.getElementById('dashboard-total-lessons');
     var engEl = document.getElementById('dashboard-eng-lessons');
     var rusEl = document.getElementById('dashboard-rus-lessons');
+    var completedCountEl = document.getElementById('dashboard-completed-count');
+    var plannedCountEl = document.getElementById('dashboard-planned-count');
+    var unpaidCountEl = document.getElementById('dashboard-unpaid-count');
     var completedEl = document.getElementById('dashboard-completed-text');
     var paidEl = document.getElementById('dashboard-paid-amount');
     var unpaidEl = document.getElementById('dashboard-unpaid-amount');
@@ -94,6 +110,15 @@
     if (totalEl) totalEl.textContent = String(stats.totalActiveLessons);
     if (engEl) engEl.textContent = String(stats.engLessons);
     if (rusEl) rusEl.textContent = String(stats.rusLessons);
+    if (completedCountEl) completedCountEl.textContent = String(stats.completedLessons);
+    if (plannedCountEl) {
+      var plannedVal =
+        typeof stats.plannedLessons === 'number'
+          ? stats.plannedLessons
+          : Math.max(0, stats.totalActiveLessons - stats.completedLessons);
+      plannedCountEl.textContent = String(plannedVal);
+    }
+    if (unpaidCountEl) unpaidCountEl.textContent = String(stats.unpaidLessonsCount);
 
     if (completedEl) {
       var statusText =
@@ -106,7 +131,7 @@
 
     if (paidEl) {
       paidEl.textContent =
-        'Оплачено уроков: ' +
+        'Оплачено: ' +
         stats.paidLessonsCount +
         ' (' +
         Calendar.formatCurrency(stats.paidAmount) +
@@ -114,11 +139,9 @@
     }
     if (unpaidEl) {
       unpaidEl.textContent =
-        'Не оплачено уроков: ' +
-        stats.unpaidLessonsCount +
-        ' (' +
-        Calendar.formatCurrency(stats.unpaidAmount) +
-        ')';
+        stats.unpaidAmount > 0
+          ? Calendar.formatCurrency(stats.unpaidAmount)
+          : '0 ₽';
     }
 
     var hasFilter = state.subjectFilter !== 'all' || Boolean(state.exactDateFilter);
@@ -127,12 +150,12 @@
         activeFilterWrap.style.display = 'flex';
         var subjName =
           state.subjectFilter === 'eng'
-            ? 'Английский'
+            ? 'ENG'
             : state.subjectFilter === 'rus'
-            ? 'Русский'
-            : 'Все предметы';
+            ? 'RUS'
+            : 'Все';
         var dateSuffix = state.exactDateFilter
-          ? ', ' + Calendar.formatRussianDate(state.exactDateFilter)
+          ? ', ' + Calendar.formatRussianDate(state.exactDateFilter, false)
           : '';
         activeFilterLabel.textContent = subjName + dateSuffix;
       } else {
@@ -194,16 +217,15 @@
     var rolloverKey = Store && Store.getLastMonthRollover ? Store.getLastMonthRollover() : '';
     var autoSyncTextEl = document.getElementById('autosync-status-text');
     var autoSyncMobileEl = document.getElementById('autosync-status-text-mobile');
-    var statusLabel = rolloverKey
-      ? 'Автозаполнение: активно (продлено на ' + rolloverKey + ')'
-      : 'Автозаполнение до конца месяца: активно';
+    var statusLabel = 'Автозаполнение до конца месяца';
     if (autoSyncTextEl) {
       autoSyncTextEl.textContent = statusLabel;
+      autoSyncTextEl.title = rolloverKey
+        ? 'Автозаполнение активно (продлено на ' + rolloverKey + ')'
+        : 'Автозаполнение до конца месяца активно';
     }
     if (autoSyncMobileEl) {
-      autoSyncMobileEl.textContent = rolloverKey
-        ? 'Автозаполнение: ' + rolloverKey
-        : 'Автозаполнение: активно';
+      autoSyncMobileEl.textContent = statusLabel;
     }
   }
 
@@ -215,26 +237,26 @@
     var weekDays = Calendar.getWeekDays(state.currentMondayISO, state.todayISO);
     var html = '';
 
+    // Highlight selected day, or if no exactDateFilter is active, highlight today (or Monday if today is not in this week)
+    var hasTodayInWeek = weekDays.some(function (d) {
+      return d.isToday;
+    });
+
     for (var i = 0; i < weekDays.length; i++) {
       var day = weekDays[i];
-      var count = state.lessons.filter(function (l) {
-        if (l.date !== day.date || l.status === 'cancelled') return false;
-        if (state.subjectFilter !== 'all' && l.subject !== state.subjectFilter) {
-          return false;
-        }
-        return true;
-      }).length;
-
       var isSelected = state.exactDateFilter === day.date;
+      var isVisualActive =
+        isSelected ||
+        (!state.exactDateFilter && (day.isToday || (!hasTodayInWeek && i === 0)));
 
       html +=
         '<button type="button" class="day-tab-btn day-pill' +
         (day.isToday ? ' is-today' : '') +
         (isSelected ? ' is-selected' : '') +
+        (isVisualActive ? ' is-active-pill' : '') +
         '" data-action="select-day-tab" data-date="' +
         day.date +
         '">' +
-        '<div>' +
         '<span class="day-tab-name">' +
         escapeHtml(day.dayNameShort) +
         '</span>' +
@@ -243,10 +265,6 @@
         ' ' +
         escapeHtml(day.monthShort) +
         '</span>' +
-        '</div>' +
-        '<span class="day-tab-badge font-mono-tabular">' +
-        count +
-        ' ур.</span>' +
         '</button>';
     }
 
@@ -283,6 +301,7 @@
     var html = '';
     for (var dIdx = 0; dIdx < visibleDays.length; dIdx++) {
       var day = visibleDays[dIdx];
+      var slotIndex = Calendar.getWeekdayIndexMondayZero(day.date);
       var dayLessons = Calendar.sortLessonsChronologically(
         state.lessons.filter(function (l) {
           if (l.date !== day.date) return false;
@@ -294,50 +313,29 @@
       );
 
       var workload = Calendar.calculateDayWorkload(dayLessons);
-      var timeRangeLabel =
-        workload.count > 0
-          ? workload.firstStart +
-            '–' +
-            workload.lastEnd +
-            ' (' +
-            workload.durationLabel +
-            ')'
-          : 'Свободно';
+      var lessonsCountLabel = formatLessonsPlural(workload.count);
 
       html +=
         '<div class="day-column day-slot-' +
-        dIdx +
+        slotIndex +
         (day.isToday ? ' is-today' : '') +
         '" data-testid="day-column-' +
         day.date +
         '">' +
-        '<div class="day-header">' +
-        '<div class="day-header-cols">' +
-        '<div class="day-header-col">' +
-        '<span class="dh-top" title="' +
-        escapeHtml(day.dayNameFull) +
+        '<div class="day-header day-theme-' +
+        slotIndex +
         '">' +
-        escapeHtml(day.dayNameShort) +
-        (day.isToday ? ' <span class="today-label">Сегодня</span>' : '') +
+        '<div class="day-header-left">' +
+        '<span class="day-name">' +
+        escapeHtml(day.dayNameFull) +
         '</span>' +
-        '<span class="dh-sub font-mono-tabular">' +
+        '<span class="day-meta font-mono-tabular">' +
         day.dayNumber +
         ' ' +
         escapeHtml(day.monthShort) +
+        ' &nbsp;•&nbsp; ' +
+        escapeHtml(lessonsCountLabel) +
         '</span>' +
-        '</div>' +
-        '<div class="day-header-col">' +
-        '<span class="dh-top">Уроков</span>' +
-        '<span class="dh-sub font-mono-tabular">' +
-        workload.count +
-        ' ур.</span>' +
-        '</div>' +
-        '<div class="day-header-col">' +
-        '<span class="dh-top">Время</span>' +
-        '<span class="dh-sub font-mono-tabular">' +
-        escapeHtml(timeRangeLabel) +
-        '</span>' +
-        '</div>' +
         '</div>' +
         '<button type="button" class="day-add-btn-inline" data-action="add-lesson-on-date" data-date="' +
         day.date +
@@ -346,8 +344,7 @@
         ' ' +
         escapeHtml(day.monthShort) +
         '">' +
-        ICONS.plus +
-        '<span>Урок</span>' +
+        '+ Добавить' +
         '</button>' +
         '</div>' +
         '<div class="day-lessons-list">';
@@ -355,7 +352,11 @@
       if (dayLessons.length === 0) {
         html +=
           '<div class="empty-day">' +
-          '<span>Свободный день — уроков нет</span>' +
+          ICONS.calendarEmpty +
+          '<div class="empty-day-texts">' +
+          '<strong class="empty-day-title">Свободный день</strong>' +
+          '<span class="empty-day-sub">Уроков не запланировано</span>' +
+          '</div>' +
           '</div>';
       } else {
         for (var lIdx = 0; lIdx < dayLessons.length; lIdx++) {
@@ -384,8 +385,14 @@
             cardStateClass = ' is-paid-card';
           } else if (isPastOrDone) {
             cardStateClass = ' is-unpaid-past-card';
+          } else {
+            cardStateClass = ' is-planned-card';
           }
 
+          var durationMins = Calendar.getDurationMinutes(
+            lesson.startTime,
+            lesson.endTime
+          );
           var hasCW = Boolean(lesson.classwork && lesson.classwork.trim());
           var hasHW = Boolean(lesson.homework && lesson.homework.trim());
 
@@ -396,38 +403,29 @@
             lesson.date
           );
 
-          var secondaryParts = [];
-          if (hasCW) {
-            secondaryParts.push(lesson.classwork.trim());
-          }
+          var calloutText = '';
           if (hasHW) {
-            secondaryParts.push('ДЗ: ' + lesson.homework.trim());
-          }
-          if (
+            calloutText = 'Д/з: ' + lesson.homework.trim();
+            if (
+              resolvedTeacherNote.active &&
+              resolvedTeacherNote.text &&
+              !isCancelled
+            ) {
+              calloutText += ' · ' + resolvedTeacherNote.text.trim();
+            }
+          } else if (
             resolvedTeacherNote.active &&
             resolvedTeacherNote.text &&
             !isCancelled
           ) {
-            secondaryParts.push('📌 ' + resolvedTeacherNote.text.trim());
+            calloutText = 'Д/з: ' + resolvedTeacherNote.text.trim();
           }
-          var secondaryLine =
-            secondaryParts.length > 0
-              ? secondaryParts.join(' · ')
-              : STATUS_LABELS[lesson.status] || 'Запланирован';
 
-          var payBtnClass = lesson.isPaid
-            ? 'paid'
-            : isPastOrDone
-            ? 'unpaid-past'
-            : 'unpaid';
-          var payBtnLabel = lesson.isPaid
-            ? '✓ ' + Calendar.formatCurrency(lessonPrice)
-            : isPastOrDone
-            ? '! ' + Calendar.formatCurrency(lessonPrice)
-            : Calendar.formatCurrency(lessonPrice);
-          var payAriaLabel = lesson.isPaid
-            ? 'Оплачено ' + Calendar.formatCurrency(lessonPrice)
-            : 'Не оплачено ' + Calendar.formatCurrency(lessonPrice);
+          var payBtnClass = lesson.isPaid ? 'paid' : 'unpaid';
+          var payBtnText = lesson.isPaid ? 'Оплачено' : 'Не оплачено';
+          var payTitle =
+            (lesson.isPaid ? 'Оплачено: ' : 'Не оплачено: ') +
+            Calendar.formatCurrency(lessonPrice);
 
           html +=
             '<div class="lesson-card' +
@@ -435,87 +433,93 @@
             '" data-testid="lesson-card-' +
             escapeHtml(lesson.id) +
             '">' +
-            '<div class="lesson-row-1">' +
-            '<button type="button" class="lesson-row-1-main lesson-card-main" data-action="open-lesson" data-lesson-id="' +
+            '<span class="lesson-left-strip" aria-hidden="true"></span>' +
+            '<div class="lesson-card-body">' +
+            '<button type="button" class="lesson-card-main" data-action="open-lesson" data-lesson-id="' +
             escapeHtml(lesson.id) +
             '">' +
+            '<div class="lesson-top-row">' +
             '<span class="lesson-time font-mono-tabular">' +
+            ICONS.clock +
+            '<span>' +
             escapeHtml(lesson.startTime) +
-            '–' +
+            ' – ' +
             escapeHtml(lesson.endTime) +
+            ' (' +
+            formatDurationLabel(durationMins) +
+            ')</span>' +
             '</span>' +
             '<span class="subject-code font-mono-tabular ' +
             (lesson.subject === 'rus' ? 'rus' : 'eng') +
             '">' +
             (lesson.subject === 'rus' ? 'RUS' : 'ENG') +
             '</span>' +
+            '</div>' +
+            '<div class="lesson-student-row">' +
             '<span class="student-color-dot" style="background-color:' +
             escapeHtml(studentColor) +
             ';" title="Цвет ученика"></span>' +
             '<span class="lesson-student">' +
             escapeHtml(studentName) +
             '</span>' +
-            '</button>';
+            '</div>' +
+            (hasCW
+              ? '<p class="lesson-topic">' +
+                escapeHtml(lesson.classwork) +
+                '</p>'
+              : '') +
+            (calloutText
+              ? '<div class="lesson-note-callout">' +
+                '<span class="callout-pin" aria-hidden="true">' +
+                ICONS.pin +
+                '</span>' +
+                '<span class="callout-text">' +
+                escapeHtml(calloutText) +
+                '</span>' +
+                '</div>'
+              : '') +
+            '</button>' +
+            '<div class="lesson-footer">' +
+            '<div class="lesson-indicators">' +
+            '<span class="indicator-item' +
+            (hasCW ? ' active' : '') +
+            '" title="Классная работа">' +
+            ICONS.book +
+            '</span>' +
+            '<span class="indicator-item' +
+            (lesson.hwChecked ? ' checked' : '') +
+            '" title="Домашнее задание">' +
+            ICONS.checkSquare +
+            '</span>' +
+            '<span class="indicator-item' +
+            (!isCancelled && lesson.repeatWeekly !== false ? ' active' : '') +
+            '" title="Автоповтор каждую неделю до конца месяца">' +
+            ICONS.refresh +
+            '</span>' +
+            '</div>';
 
           if (!isCancelled) {
             html +=
-              '<button type="button" class="payment-toggle-btn font-mono-tabular ' +
+              '<button type="button" class="payment-toggle-btn ' +
               payBtnClass +
               '" data-action="toggle-paid" data-lesson-id="' +
               escapeHtml(lesson.id) +
               '" aria-label="' +
-              escapeHtml(payAriaLabel) +
+              escapeHtml(payTitle) +
               '" title="' +
-              escapeHtml(
-                lesson.isPaid
-                  ? 'Оплачено (нажмите для отмены)'
-                  : 'Отметить как оплаченный'
-              ) +
+              escapeHtml(payTitle) +
               '">' +
+              (lesson.isPaid ? ICONS.card : ICONS.alert) +
               '<span>' +
-              escapeHtml(payBtnLabel) +
+              escapeHtml(payBtnText) +
               '</span>' +
               '</button>';
+          } else {
+            html +=
+              '<span class="cancelled-badge">Отменен</span>';
           }
 
-          html +=
-            '</div>' +
-            '<button type="button" class="lesson-row-2" data-action="open-lesson" data-lesson-id="' +
-            escapeHtml(lesson.id) +
-            '">' +
-            '<span class="lesson-row-2-text" title="' +
-            escapeHtml(secondaryLine) +
-            '">' +
-            escapeHtml(secondaryLine) +
-            '</span>' +
-            '<span class="lesson-indicators">';
-
-          if (hasHW) {
-            html +=
-              '<span class="indicator-item' +
-              (lesson.hwChecked ? ' checked' : '') +
-              '" title="Домашнее задание">' +
-              (lesson.hwChecked ? '✓ДЗ' : 'ДЗ') +
-              '</span>';
-          }
-          if (
-            resolvedTeacherNote.active &&
-            resolvedTeacherNote.text &&
-            !isCancelled
-          ) {
-            html +=
-              '<span class="indicator-item" title="' +
-              escapeHtml('Заметка для учителя: ' + resolvedTeacherNote.text) +
-              '">📌</span>';
-          }
-          if (!isCancelled && lesson.repeatWeekly !== false) {
-            html +=
-              '<span class="indicator-item" title="Автоматический повтор каждую неделю до конца месяца">' +
-              ICONS.refresh +
-              '</span>';
-          }
-
-          html += '</span></button></div>';
+          html += '</div></div></div>';
         }
       }
 
@@ -576,7 +580,6 @@
 
     if (!container) return;
 
-    // Single-pass O(N) aggregation of stats across all lessons
     var statsMap = Calendar.buildStudentStatsMap(state.lessons);
 
     var historyStudent = null;
@@ -742,7 +745,7 @@
       return;
     }
 
-    // Directory view rendered via DocumentFragment for zero-lag modal opening
+    // Directory view rendered via DocumentFragment
     if (titleEl) titleEl.textContent = 'База учеников и История';
     if (subtitleEl) {
       subtitleEl.textContent = 'Всего учеников в справочнике: ' + state.students.length;
@@ -838,7 +841,6 @@
       var cardEl = document.createElement('div');
       cardEl.className = 'student-card';
       cardEl.setAttribute('data-testid', 'student-row-' + stu.id);
-      cardEl.style.borderLeft = '4px solid ' + stuColor;
 
       cardEl.innerHTML =
         '<div>' +

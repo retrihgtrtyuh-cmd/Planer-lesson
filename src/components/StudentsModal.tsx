@@ -99,29 +99,30 @@ export const StudentsModal: React.FC<StudentsModalProps> = ({
       role="dialog"
       aria-modal="true"
       aria-labelledby="students-modal-title"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 overflow-y-auto"
+      className="modal-backdrop"
     >
-      <div className="bg-white border border-slate-200 rounded-xl shadow-xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden">
+      <div className="modal-window modal-xl">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
+        <div className="modal-header">
+          <div className="toolbar-group">
             {historyStudent && (
               <button
                 type="button"
                 onClick={() => setSelectedHistoryStudentId(null)}
-                className="p-1.5 text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
+                className="btn-secondary"
                 aria-label="Назад к списку учеников"
               >
-                <ArrowLeft className="w-4 h-4" />
+                <ArrowLeft className="icon-sm" />
+                <span>Назад</span>
               </button>
             )}
             <div>
-              <h2 id="students-modal-title" className="text-lg font-bold text-slate-900">
+              <h2 id="students-modal-title" className="modal-title">
                 {historyStudent
                   ? `История занятий: ${historyStudent.name}`
                   : 'База учеников и История'}
               </h2>
-              <p className="text-xs text-slate-500 mt-0.5">
+              <p className="modal-subtitle">
                 {historyStudent
                   ? `Базовый предмет: ${
                       historyStudent.defaultSubject === 'eng' ? 'Английский (ENG)' : 'Русский (RUS)'
@@ -131,14 +132,10 @@ export const StudentsModal: React.FC<StudentsModalProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="toolbar-group">
             {!historyStudent && !isFormOpen && (
-              <button
-                type="button"
-                onClick={openAddForm}
-                className="px-3.5 py-2 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-lg transition-colors inline-flex items-center gap-1.5 cursor-pointer"
-              >
-                <Plus className="w-4 h-4" />
+              <button type="button" onClick={openAddForm} className="btn-primary">
+                <Plus className="icon-sm" />
                 <span>Добавить ученика</span>
               </button>
             )}
@@ -146,41 +143,43 @@ export const StudentsModal: React.FC<StudentsModalProps> = ({
               type="button"
               onClick={onClose}
               aria-label="Закрыть базу учеников"
-              className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+              className="modal-close-btn"
             >
-              <X className="w-5 h-5" />
+              <X className="icon-svg" />
             </button>
           </div>
         </div>
 
         {/* Body */}
-        <div className="p-6 overflow-y-auto flex-1 space-y-5">
+        <div className="modal-body">
           {/* VIEW 1: Student Chronological Lesson History */}
           {historyStudent ? (
-            <div className="space-y-4">
+            <>
               {historyStudent.notes && (
-                <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-700">
-                  <strong>Профиль и цели ученика:</strong> {historyStudent.notes}
+                <div className="subpanel-box">
+                  <span>
+                    <strong>Профиль и цели ученика:</strong> {historyStudent.notes}
+                  </span>
                 </div>
               )}
 
               {/* Summary metrics for this student */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
-                  <span className="text-[11px] text-slate-500 block">Всего записей</span>
-                  <span className="text-base font-bold font-mono-tabular text-slate-900">
+              <div className="stats-grid-4">
+                <div className="stat-mini-box">
+                  <span className="metric-label">Всего записей</span>
+                  <span className="metric-big-num font-mono-tabular">
                     {studentLessons.length}
                   </span>
                 </div>
-                <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
-                  <span className="text-[11px] text-slate-500 block">Проведено уроков</span>
-                  <span className="text-base font-bold font-mono-tabular text-slate-900">
+                <div className="stat-mini-box">
+                  <span className="metric-label">Проведено уроков</span>
+                  <span className="metric-big-num font-mono-tabular">
                     {studentLessons.filter((l) => l.status === 'completed').length}
                   </span>
                 </div>
-                <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
-                  <span className="text-[11px] text-slate-500 block">Оплачено всего</span>
-                  <span className="text-base font-bold font-mono-tabular text-emerald-700">
+                <div className="stat-mini-box">
+                  <span className="metric-label">Оплачено всего</span>
+                  <span className="metric-big-num text-paid font-mono-tabular">
                     {formatCurrencyRUB(
                       studentLessons
                         .filter((l) => l.status !== 'cancelled' && l.isPaid)
@@ -188,9 +187,9 @@ export const StudentsModal: React.FC<StudentsModalProps> = ({
                     )}
                   </span>
                 </div>
-                <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
-                  <span className="text-[11px] text-slate-500 block">Ожидает оплаты</span>
-                  <span className="text-base font-bold font-mono-tabular text-rose-600">
+                <div className="stat-mini-box">
+                  <span className="metric-label">Ожидает оплаты</span>
+                  <span className="metric-big-num text-unpaid font-mono-tabular">
                     {formatCurrencyRUB(
                       studentLessons
                         .filter((l) => l.status !== 'cancelled' && !l.isPaid)
@@ -201,26 +200,26 @@ export const StudentsModal: React.FC<StudentsModalProps> = ({
               </div>
 
               {studentLessons.length === 0 ? (
-                <div className="p-8 text-center border border-slate-200 rounded-xl">
-                  <p className="text-sm text-slate-500">
+                <div className="subpanel-box">
+                  <p className="student-notes">
                     У этого ученика пока нет запланированных или проведенных уроков.
                   </p>
                 </div>
               ) : (
-                <div className="border border-slate-200 rounded-xl overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
+                <div className="table-wrap">
+                  <table className="history-table">
                     <thead>
-                      <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold text-slate-600">
-                        <th className="py-2.5 px-3">Дата</th>
-                        <th className="py-2.5 px-3">Время</th>
-                        <th className="py-2.5 px-3">Предмет</th>
-                        <th className="py-2.5 px-3">Статус</th>
-                        <th className="py-2.5 px-3">Классная работа (CW)</th>
-                        <th className="py-2.5 px-3">Домашнее задание (HW)</th>
-                        <th className="py-2.5 px-3 text-right">Оплата</th>
+                      <tr>
+                        <th>Дата</th>
+                        <th>Время</th>
+                        <th>Предмет</th>
+                        <th>Статус</th>
+                        <th>Классная работа (CW)</th>
+                        <th>Домашнее задание (HW)</th>
+                        <th>Оплата</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-200 text-xs">
+                    <tbody>
                       {studentLessons.map((lesson) => (
                         <tr
                           key={lesson.id}
@@ -228,69 +227,58 @@ export const StudentsModal: React.FC<StudentsModalProps> = ({
                             onClose();
                             onEditLessonFromHistory(lesson);
                           }}
-                          className="hover:bg-slate-50 transition-colors cursor-pointer"
                         >
-                          <td className="py-3 px-3 font-mono-tabular whitespace-nowrap font-medium text-slate-900">
-                            {formatRussianDate(lesson.date)}
+                          <td className="font-mono-tabular">
+                            <strong>{formatRussianDate(lesson.date)}</strong>
                           </td>
-                          <td className="py-3 px-3 font-mono-tabular whitespace-nowrap text-slate-600">
+                          <td className="font-mono-tabular">
                             {lesson.startTime} – {lesson.endTime}
                           </td>
-                          <td className="py-3 px-3 font-mono-tabular font-semibold">
+                          <td className="font-mono-tabular">
                             <span
-                              className={
-                                lesson.subject === 'eng' ? 'text-blue-700' : 'text-emerald-700'
-                              }
+                              className={`subject-code ${
+                                lesson.subject === 'eng' ? 'eng' : 'rus'
+                              }`}
                             >
                               {lesson.subject === 'eng' ? 'ENG' : 'RUS'}
                             </span>
                           </td>
-                          <td className="py-3 px-3 whitespace-nowrap">
+                          <td>
                             <span
                               className={
                                 lesson.status === 'completed'
-                                  ? 'text-emerald-700 font-medium'
+                                  ? 'text-paid'
                                   : lesson.status === 'cancelled'
-                                  ? 'text-slate-400 line-through'
-                                  : 'text-slate-700'
+                                  ? 'cancelled-badge'
+                                  : ''
                               }
                             >
                               {STATUS_NAMES[lesson.status]}
                             </span>
                           </td>
-                          <td className="py-3 px-3 text-slate-700 max-w-xs">
-                            {lesson.classwork || <span className="text-slate-400">—</span>}
-                          </td>
-                          <td className="py-3 px-3 text-slate-700 max-w-xs">
+                          <td>{lesson.classwork || '—'}</td>
+                          <td>
                             {lesson.homework ? (
                               <div>
                                 <span>{lesson.homework}</span>
                                 {lesson.hwChecked && (
-                                  <span className="block text-[11px] text-emerald-700 font-medium mt-0.5">
-                                    ✓ Проверено
-                                  </span>
+                                  <div className="text-paid">✓ Проверено</div>
                                 )}
                               </div>
                             ) : (
-                              <span className="text-slate-400">—</span>
+                              '—'
                             )}
                           </td>
-                          <td className="py-3 px-3 text-right font-mono-tabular whitespace-nowrap">
+                          <td className="font-mono-tabular">
                             {lesson.status === 'cancelled' ? (
-                              <span className="text-slate-400">Отменен</span>
+                              <span className="cancelled-badge">Отменен</span>
                             ) : (
                               <div>
-                                <span
-                                  className={`font-semibold ${
-                                    lesson.isPaid ? 'text-emerald-700' : 'text-rose-600'
-                                  }`}
-                                >
+                                <span className={lesson.isPaid ? 'text-paid' : 'text-unpaid'}>
                                   {lesson.price} ₽ · {lesson.isPaid ? 'Оплачено' : 'Не оплачено'}
                                 </span>
                                 {lesson.paymentNote && (
-                                  <span className="block text-[11px] text-slate-500">
-                                    {lesson.paymentNote}
-                                  </span>
+                                  <div className="student-meta">{lesson.paymentNote}</div>
                                 )}
                               </div>
                             )}
@@ -301,37 +289,30 @@ export const StudentsModal: React.FC<StudentsModalProps> = ({
                   </table>
                 </div>
               )}
-            </div>
+            </>
           ) : (
             /* VIEW 2: Directory of Students + Add/Edit Form */
-            <div className="space-y-5">
+            <>
               {isFormOpen && (
-                <form
-                  onSubmit={handleStudentSubmit}
-                  className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-4"
-                >
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-bold text-slate-900">
+                <form onSubmit={handleStudentSubmit} className="subpanel-box">
+                  <div className="modal-row-between">
+                    <h3 className="student-name">
                       {editingStudent ? 'Редактировать профиль ученика' : 'Новый ученик'}
                     </h3>
                     <button
                       type="button"
                       onClick={() => setIsFormOpen(false)}
-                      className="text-xs text-slate-500 hover:text-slate-800 cursor-pointer"
+                      className="btn-link-muted"
                     >
                       Скрыть форму
                     </button>
                   </div>
 
-                  {errorMsg && (
-                    <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-xs text-rose-700">
-                      {errorMsg}
-                    </div>
-                  )}
+                  {errorMsg && <div className="error-alert-box">{errorMsg}</div>}
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="form-row-3">
                     <div>
-                      <label htmlFor="student-form-name" className="block text-xs font-semibold text-slate-700 mb-1">
+                      <label htmlFor="student-form-name" className="field-label">
                         Имя и фамилия *
                       </label>
                       <input
@@ -340,25 +321,25 @@ export const StudentsModal: React.FC<StudentsModalProps> = ({
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         placeholder="Например, Дмитрий Смирнов"
-                        className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-lg"
+                        className="field-input"
                       />
                     </div>
                     <div>
-                      <label htmlFor="student-form-subject" className="block text-xs font-semibold text-slate-700 mb-1">
+                      <label htmlFor="student-form-subject" className="field-label">
                         Предмет по умолчанию
                       </label>
                       <select
                         id="student-form-subject"
                         value={defaultSubject}
                         onChange={(e) => setDefaultSubject(e.target.value as Subject)}
-                        className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-lg"
+                        className="field-select"
                       >
                         <option value="eng">🇬🇧 Английский язык (ENG)</option>
                         <option value="rus">🇷🇺 Русский язык (RUS)</option>
                       </select>
                     </div>
                     <div>
-                      <label htmlFor="student-form-price" className="block text-xs font-semibold text-slate-700 mb-1">
+                      <label htmlFor="student-form-price" className="field-label">
                         Базовая стоимость урока (₽)
                       </label>
                       <input
@@ -368,13 +349,13 @@ export const StudentsModal: React.FC<StudentsModalProps> = ({
                         step={100}
                         value={defaultPrice}
                         onChange={(e) => setDefaultPrice(Number(e.target.value))}
-                        className="w-full px-3 py-2 text-sm font-mono-tabular bg-white border border-slate-300 rounded-lg"
+                        className="field-input font-mono-tabular"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label htmlFor="student-form-notes" className="block text-xs font-semibold text-slate-700 mb-1">
+                    <label htmlFor="student-form-notes" className="field-label">
                       Заметка об ученике (уровень, цели, учебник)
                     </label>
                     <textarea
@@ -383,31 +364,28 @@ export const StudentsModal: React.FC<StudentsModalProps> = ({
                       value={notes}
                       onChange={(e) => setNotes(e.target.value)}
                       placeholder="Уровень знаний, экзамен, используемые пособия, пожелания..."
-                      className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-lg"
+                      className="field-textarea"
                     />
                   </div>
 
-                  <div className="flex justify-end gap-2">
+                  <div className="modal-actions-group">
                     <button
                       type="button"
                       onClick={() => setIsFormOpen(false)}
-                      className="px-3.5 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-100 rounded-lg cursor-pointer"
+                      className="btn-secondary"
                     >
                       Отмена
                     </button>
-                    <button
-                      type="submit"
-                      className="px-4 py-2 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-lg inline-flex items-center gap-1.5 cursor-pointer"
-                    >
-                      <UserCheck className="w-4 h-4" />
+                    <button type="submit" className="btn-primary">
+                      <UserCheck className="icon-sm" />
                       <span>{editingStudent ? 'Сохранить изменения' : 'Создать ученика'}</span>
                     </button>
                   </div>
                 </form>
               )}
 
-              {/* Students Cards / Table */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+              {/* Students Cards */}
+              <div className="students-grid">
                 {students.map((stu) => {
                   const stuLessons = lessons.filter(
                     (l) => l.studentId === stu.id && l.status !== 'cancelled'
@@ -418,56 +396,51 @@ export const StudentsModal: React.FC<StudentsModalProps> = ({
                     <div
                       key={stu.id}
                       data-testid={`student-row-${stu.id}`}
-                      className="p-4 bg-white border border-slate-200 rounded-xl flex flex-col justify-between gap-3"
+                      className="student-card"
                     >
-                      <div className="space-y-1.5">
-                        <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <div className="student-card-header">
                           <div>
-                            <h3 className="text-base font-bold text-slate-900">{stu.name}</h3>
-                            <div className="text-xs text-slate-500 font-mono-tabular mt-0.5">
+                            <h3 className="student-name">{stu.name}</h3>
+                            <div className="student-meta font-mono-tabular">
                               <span
-                                className={`font-semibold ${
-                                  stu.defaultSubject === 'eng'
-                                    ? 'text-blue-700'
-                                    : 'text-emerald-700'
-                                }`}
+                                className={
+                                  stu.defaultSubject === 'eng' ? 'text-eng' : 'text-rus'
+                                }
                               >
                                 {stu.defaultSubject === 'eng'
                                   ? '🇬🇧 Английский (ENG)'
                                   : '🇷🇺 Русский (RUS)'}
-                              </span>
-                              <span aria-hidden="true" className="mx-1.5">
-                                ·
-                              </span>
-                              <span>Базовая ставка: {stu.defaultPrice} ₽</span>
+                              </span>{' '}
+                              · Базовая ставка: {stu.defaultPrice} ₽
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-1">
+                          <div className="toolbar-group">
                             <button
                               type="button"
                               onClick={() => openEditForm(stu)}
                               aria-label={`Редактировать ${stu.name}`}
-                              className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-md cursor-pointer"
+                              className="icon-btn-muted"
                             >
-                              <Edit3 className="w-4 h-4" />
+                              <Edit3 className="icon-svg" />
                             </button>
                             {confirmDeleteId === stu.id ? (
-                              <div className="flex items-center gap-1 bg-rose-50 px-2 py-1 rounded-md">
+                              <div className="delete-confirm-inline">
                                 <button
                                   type="button"
                                   onClick={() => {
                                     onDeleteStudent(stu.id);
                                     setConfirmDeleteId(null);
                                   }}
-                                  className="text-[11px] font-semibold text-rose-700 hover:underline cursor-pointer"
+                                  className="text-unpaid"
                                 >
                                   Удалить
                                 </button>
                                 <button
                                   type="button"
                                   onClick={() => setConfirmDeleteId(null)}
-                                  className="text-[11px] text-slate-500 cursor-pointer"
+                                  className="btn-link-muted"
                                 >
                                   Отмена
                                 </button>
@@ -477,30 +450,24 @@ export const StudentsModal: React.FC<StudentsModalProps> = ({
                                 type="button"
                                 onClick={() => setConfirmDeleteId(stu.id)}
                                 aria-label={`Удалить ${stu.name}`}
-                                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md cursor-pointer"
+                                className="icon-btn-danger"
                               >
-                                <Trash2 className="w-4 h-4" />
+                                <Trash2 className="icon-svg" />
                               </button>
                             )}
                           </div>
                         </div>
 
-                        {stu.notes && (
-                          <p className="text-xs text-slate-600 leading-relaxed">{stu.notes}</p>
-                        )}
+                        {stu.notes && <p className="student-notes">{stu.notes}</p>}
                       </div>
 
-                      <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
-                        <div className="text-xs text-slate-500 font-mono-tabular">
-                          Уроков: <strong className="text-slate-800">{stuLessons.length}</strong>
+                      <div className="student-card-footer">
+                        <div className="student-meta font-mono-tabular">
+                          Уроков: <strong>{stuLessons.length}</strong>
                           {unpaidCount > 0 && (
                             <>
-                              <span aria-hidden="true" className="mx-1.5">
-                                ·
-                              </span>
-                              <span className="text-rose-600 font-medium">
-                                Не оплачено: {unpaidCount}
-                              </span>
+                              {' '}
+                              · <span className="text-unpaid">Не оплачено: {unpaidCount}</span>
                             </>
                           )}
                         </div>
@@ -508,9 +475,9 @@ export const StudentsModal: React.FC<StudentsModalProps> = ({
                         <button
                           type="button"
                           onClick={() => setSelectedHistoryStudentId(stu.id)}
-                          className="px-3 py-1.5 text-xs font-semibold text-slate-800 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+                          className="btn-secondary"
                         >
-                          <History className="w-3.5 h-3.5" />
+                          <History className="icon-sm" />
                           <span>История занятий</span>
                         </button>
                       </div>
@@ -518,7 +485,7 @@ export const StudentsModal: React.FC<StudentsModalProps> = ({
                   );
                 })}
               </div>
-            </div>
+            </>
           )}
         </div>
       </div>

@@ -1,10 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
-  BookOpen,
   CheckCircle2,
-  Clock,
-  CreditCard,
-  History,
   Plus,
   Trash2,
   UserPlus,
@@ -175,16 +171,16 @@ export const LessonModal: React.FC<LessonModalProps> = ({
       role="dialog"
       aria-modal="true"
       aria-labelledby="lesson-modal-title"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 overflow-y-auto"
+      className="modal-backdrop"
     >
-      <div className="bg-white border border-slate-200 rounded-xl shadow-xl w-full max-w-2xl max-h-[92vh] flex flex-col overflow-hidden">
+      <div className="modal-window">
         {/* Modal Header */}
-        <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+        <div className="modal-header">
           <div>
-            <h2 id="lesson-modal-title" className="text-lg font-bold text-slate-900">
+            <h2 id="lesson-modal-title" className="modal-title">
               {initialLesson ? 'Редактирование урока' : 'Новое занятие'}
             </h2>
-            <p className="text-xs text-slate-500 mt-0.5">
+            <p className="modal-subtitle">
               {date ? formatRussianDate(date) : 'Выберите дату и параметры занятия'}
             </p>
           </div>
@@ -192,44 +188,40 @@ export const LessonModal: React.FC<LessonModalProps> = ({
             type="button"
             onClick={onClose}
             aria-label="Закрыть окно"
-            className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+            className="modal-close-btn"
           >
-            <X className="w-5 h-5" />
+            <X className="icon-svg" />
           </button>
         </div>
 
         {/* Modal Body */}
-        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
-          <div className="px-6 py-4 overflow-y-auto space-y-4 flex-1">
-            {formError && (
-              <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg text-xs text-rose-700 font-medium">
-                {formError}
-              </div>
-            )}
+        <form onSubmit={handleSubmit} className="modal-form">
+          <div className="modal-body">
+            {formError && <div className="error-alert-box">{formError}</div>}
 
             {/* Student Selector + Quick Add */}
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <label htmlFor="lesson-student" className="text-xs font-semibold text-slate-700">
+            <div>
+              <div className="modal-row-between">
+                <label htmlFor="lesson-student" className="field-label">
                   Ученик
                 </label>
                 <button
                   type="button"
                   onClick={() => setIsAddingStudent((prev) => !prev)}
-                  className="text-xs font-semibold text-blue-700 hover:text-blue-800 inline-flex items-center gap-1 cursor-pointer"
+                  className="btn-link-primary"
                 >
-                  <UserPlus className="w-3.5 h-3.5" />
+                  <UserPlus className="icon-sm" />
                   <span>{isAddingStudent ? 'Отменить создание' : '+ Быстро создать ученика'}</span>
                 </button>
               </div>
 
               {!isAddingStudent ? (
-                <div className="space-y-1">
+                <div>
                   <select
                     id="lesson-student"
                     value={studentId}
                     onChange={(e) => handleStudentChange(e.target.value)}
-                    className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900"
+                    className="field-select"
                   >
                     {students.length === 0 && <option value="">Нет учеников в базе</option>}
                     {students.map((stu) => (
@@ -240,19 +232,15 @@ export const LessonModal: React.FC<LessonModalProps> = ({
                     ))}
                   </select>
                   {selectedStudent?.notes && (
-                    <p className="text-xs text-slate-500 line-clamp-1">
-                      Заметка: {selectedStudent.notes}
-                    </p>
+                    <p className="student-notes">Заметка: {selectedStudent.notes}</p>
                   )}
                 </div>
               ) : (
-                <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-lg space-y-3">
-                  <div className="text-xs font-semibold text-slate-800">
-                    Новый ученик (сохранится в справочник)
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                    <div className="sm:col-span-1">
-                      <label htmlFor="quick-student-name" className="block text-[11px] text-slate-600 mb-1">
+                <div className="subpanel-box">
+                  <div className="field-label">Новый ученик (сохранится в справочник)</div>
+                  <div className="form-row-3">
+                    <div>
+                      <label htmlFor="quick-student-name" className="field-label">
                         Имя ученика *
                       </label>
                       <input
@@ -261,25 +249,25 @@ export const LessonModal: React.FC<LessonModalProps> = ({
                         placeholder="Например, Мария Иванова"
                         value={newStudentName}
                         onChange={(e) => setNewStudentName(e.target.value)}
-                        className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-300 rounded-md"
+                        className="field-input"
                       />
                     </div>
                     <div>
-                      <label htmlFor="quick-student-subject" className="block text-[11px] text-slate-600 mb-1">
+                      <label htmlFor="quick-student-subject" className="field-label">
                         Предмет по умолчанию
                       </label>
                       <select
                         id="quick-student-subject"
                         value={newStudentSubject}
                         onChange={(e) => setNewStudentSubject(e.target.value as Subject)}
-                        className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-300 rounded-md"
+                        className="field-select"
                       >
                         <option value="eng">🇬🇧 Английский (ENG)</option>
                         <option value="rus">🇷🇺 Русский (RUS)</option>
                       </select>
                     </div>
                     <div>
-                      <label htmlFor="quick-student-price" className="block text-[11px] text-slate-600 mb-1">
+                      <label htmlFor="quick-student-price" className="field-label">
                         Базовая ставка (₽)
                       </label>
                       <input
@@ -289,12 +277,12 @@ export const LessonModal: React.FC<LessonModalProps> = ({
                         step={100}
                         value={newStudentPrice}
                         onChange={(e) => setNewStudentPrice(Number(e.target.value))}
-                        className="w-full px-2.5 py-1.5 text-xs font-mono-tabular bg-white border border-slate-300 rounded-md"
+                        className="field-input font-mono-tabular"
                       />
                     </div>
                   </div>
                   <div>
-                    <label htmlFor="quick-student-notes" className="block text-[11px] text-slate-600 mb-1">
+                    <label htmlFor="quick-student-notes" className="field-label">
                       Заметка (уровень, цели, учебник)
                     </label>
                     <input
@@ -303,23 +291,23 @@ export const LessonModal: React.FC<LessonModalProps> = ({
                       placeholder="Например: B1, подготовка к ОГЭ, Outcomes"
                       value={newStudentNotes}
                       onChange={(e) => setNewStudentNotes(e.target.value)}
-                      className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-300 rounded-md"
+                      className="field-input"
                     />
                   </div>
-                  <div className="flex justify-end gap-2">
+                  <div className="modal-actions-group">
                     <button
                       type="button"
                       onClick={() => setIsAddingStudent(false)}
-                      className="px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 cursor-pointer"
+                      className="btn-secondary"
                     >
                       Отмена
                     </button>
                     <button
                       type="button"
                       onClick={handleCreateQuickStudent}
-                      className="px-3 py-1.5 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-md cursor-pointer inline-flex items-center gap-1"
+                      className="btn-primary"
                     >
-                      <Plus className="w-3.5 h-3.5" />
+                      <Plus className="icon-sm" />
                       <span>Добавить и выбрать</span>
                     </button>
                   </div>
@@ -327,10 +315,10 @@ export const LessonModal: React.FC<LessonModalProps> = ({
               )}
             </div>
 
-            {/* Date, Start/End Time, Subject, Status */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {/* Date, Start/End Time */}
+            <div className="form-row-3">
               <div>
-                <label htmlFor="lesson-date" className="block text-xs font-semibold text-slate-700 mb-1">
+                <label htmlFor="lesson-date" className="field-label">
                   Дата урока
                 </label>
                 <input
@@ -338,12 +326,12 @@ export const LessonModal: React.FC<LessonModalProps> = ({
                   type="date"
                   value={date}
                   onChange={(e) => setDate(e.target.value)}
-                  className="w-full px-3 py-1.5 text-sm font-mono-tabular bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900"
+                  className="field-input font-mono-tabular"
                 />
               </div>
 
               <div>
-                <label htmlFor="lesson-start-time" className="block text-xs font-semibold text-slate-700 mb-1">
+                <label htmlFor="lesson-start-time" className="field-label">
                   Время начала
                 </label>
                 <input
@@ -351,12 +339,12 @@ export const LessonModal: React.FC<LessonModalProps> = ({
                   type="time"
                   value={startTime}
                   onChange={(e) => setStartTime(e.target.value)}
-                  className="w-full px-3 py-1.5 text-sm font-mono-tabular bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900"
+                  className="field-input font-mono-tabular"
                 />
               </div>
 
               <div>
-                <label htmlFor="lesson-end-time" className="block text-xs font-semibold text-slate-700 mb-1">
+                <label htmlFor="lesson-end-time" className="field-label">
                   Время окончания
                 </label>
                 <input
@@ -364,21 +352,21 @@ export const LessonModal: React.FC<LessonModalProps> = ({
                   type="time"
                   value={endTime}
                   onChange={(e) => setEndTime(e.target.value)}
-                  className="w-full px-3 py-1.5 text-sm font-mono-tabular bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900"
+                  className="field-input font-mono-tabular"
                 />
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="form-row-2">
               <div>
-                <label htmlFor="lesson-subject" className="block text-xs font-semibold text-slate-700 mb-1">
+                <label htmlFor="lesson-subject" className="field-label">
                   Предмет
                 </label>
                 <select
                   id="lesson-subject"
                   value={subject}
                   onChange={(e) => setSubject(e.target.value as Subject)}
-                  className="w-full px-3 py-1.5 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900"
+                  className="field-select"
                 >
                   <option value="eng">🇬🇧 Английский язык (ENG)</option>
                   <option value="rus">🇷🇺 Русский язык (RUS)</option>
@@ -386,14 +374,14 @@ export const LessonModal: React.FC<LessonModalProps> = ({
               </div>
 
               <div>
-                <label htmlFor="lesson-status" className="block text-xs font-semibold text-slate-700 mb-1">
+                <label htmlFor="lesson-status" className="field-label">
                   Статус урока
                 </label>
                 <select
                   id="lesson-status"
                   value={status}
                   onChange={(e) => setStatus(e.target.value as LessonStatus)}
-                  className="w-full px-3 py-1.5 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900"
+                  className="field-select"
                 >
                   <option value="planned">Запланирован</option>
                   <option value="completed">Проведен</option>
@@ -404,53 +392,35 @@ export const LessonModal: React.FC<LessonModalProps> = ({
             </div>
 
             {/* Smart Hint: ДЗ с прошлого урока */}
-            <div
-              data-testid="smart-previous-hw-banner"
-              className="p-3 bg-amber-50/70 border border-amber-200 rounded-lg space-y-1"
-            >
-              <div className="flex items-center justify-between text-xs font-semibold text-amber-900">
-                <span className="inline-flex items-center gap-1.5">
-                  <History className="w-4 h-4 text-amber-700" />
-                  <span>ДЗ с прошлого урока (умная подсказка)</span>
-                </span>
+            <div data-testid="smart-previous-hw-banner" className="smart-hw-box">
+              <div className="smart-hw-header">
+                <span>ДЗ с прошлого урока (умная подсказка)</span>
                 {previousLesson && (
-                  <span className="font-mono-tabular text-amber-800">
+                  <span className="font-mono-tabular">
                     Урок от {formatRussianDate(previousLesson.date, false)}
                   </span>
                 )}
               </div>
               {previousLesson ? (
-                <div className="text-xs text-amber-950 space-y-0.5">
+                <div>
                   {previousLesson.homework ? (
-                    <p className="leading-relaxed">
+                    <p>
                       <strong>Задано:</strong> {previousLesson.homework}
                     </p>
                   ) : (
-                    <p className="text-amber-800 italic">
-                      На прошлом уроке домашнее задание не было записано.
-                    </p>
+                    <p>На прошлом уроке домашнее задание не было записано.</p>
                   )}
-                  {previousLesson.classwork && (
-                    <p className="text-[11px] text-amber-800">
-                      Прошлая тема: {previousLesson.classwork}
-                    </p>
-                  )}
+                  {previousLesson.classwork && <p>Прошлая тема: {previousLesson.classwork}</p>}
                 </div>
               ) : (
-                <p className="text-xs text-amber-800">
-                  Предыдущих проведенных уроков у этого ученика до выбранной даты не найдено.
-                </p>
+                <p>Предыдущих проведенных уроков у этого ученика до выбранной даты не найдено.</p>
               )}
             </div>
 
             {/* Classwork (CW) */}
             <div>
-              <label
-                htmlFor="lesson-classwork"
-                className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 mb-1"
-              >
-                <BookOpen className="w-3.5 h-3.5 text-slate-500" />
-                <span>Классная работа (CW) / Тема урока</span>
+              <label htmlFor="lesson-classwork" className="field-label">
+                Классная работа (CW) / Тема урока
               </label>
               <textarea
                 id="lesson-classwork"
@@ -458,27 +428,22 @@ export const LessonModal: React.FC<LessonModalProps> = ({
                 value={classwork}
                 onChange={(e) => setClasswork(e.target.value)}
                 placeholder="Что разбирали на занятии: темы, упражнения, результаты..."
-                className="w-full px-3 py-1.5 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900"
+                className="field-textarea"
               />
             </div>
 
             {/* Homework (HW) + Checkbox */}
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <label
-                  htmlFor="lesson-homework"
-                  className="flex items-center gap-1.5 text-xs font-semibold text-slate-700"
-                >
-                  <Clock className="w-3.5 h-3.5 text-slate-500" />
-                  <span>Домашнее задание (HW) на следующий раз</span>
+            <div>
+              <div className="modal-row-between">
+                <label htmlFor="lesson-homework" className="field-label">
+                  Домашнее задание (HW) на следующий раз
                 </label>
 
-                <label className="inline-flex items-center gap-2 text-xs font-medium text-slate-700 cursor-pointer select-none">
+                <label className="checkbox-label">
                   <input
                     type="checkbox"
                     checked={hwChecked}
                     onChange={(e) => setHwChecked(e.target.checked)}
-                    className="w-4 h-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
                   />
                   <span>ДЗ выполнено / проверено</span>
                 </label>
@@ -489,34 +454,30 @@ export const LessonModal: React.FC<LessonModalProps> = ({
                 value={homework}
                 onChange={(e) => setHomework(e.target.value)}
                 placeholder="Укажите страницы учебника, упражнения или тему эссе..."
-                className="w-full px-3 py-1.5 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900"
+                className="field-textarea"
               />
             </div>
 
             {/* Payment Block */}
-            <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-lg space-y-2.5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-slate-800 inline-flex items-center gap-1.5">
-                  <CreditCard className="w-4 h-4 text-slate-600" />
-                  <span>Оплата занятия</span>
-                </span>
+            <div className="payment-box">
+              <div className="modal-row-between">
+                <strong className="field-label">Оплата занятия</strong>
 
-                <label className="inline-flex items-center gap-2 text-xs font-semibold cursor-pointer select-none">
+                <label className="checkbox-label">
                   <input
                     type="checkbox"
                     checked={isPaid}
                     onChange={(e) => setIsPaid(e.target.checked)}
-                    className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-600"
                   />
-                  <span className={isPaid ? 'text-emerald-700' : 'text-rose-600'}>
+                  <span className={isPaid ? 'text-paid' : 'text-unpaid'}>
                     {isPaid ? 'Оплачено' : 'Не оплачено'}
                   </span>
                 </label>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="form-row-2">
                 <div>
-                  <label htmlFor="lesson-price" className="block text-[11px] text-slate-600 mb-1">
+                  <label htmlFor="lesson-price" className="field-label">
                     Стоимость урока (₽)
                   </label>
                   <input
@@ -526,12 +487,12 @@ export const LessonModal: React.FC<LessonModalProps> = ({
                     step={100}
                     value={price}
                     onChange={(e) => setPrice(Number(e.target.value))}
-                    className="w-full px-3 py-1.5 text-sm font-mono-tabular bg-white border border-slate-300 rounded-lg"
+                    className="field-input font-mono-tabular"
                   />
                 </div>
 
                 <div>
-                  <label htmlFor="lesson-payment-note" className="block text-[11px] text-slate-600 mb-1">
+                  <label htmlFor="lesson-payment-note" className="field-label">
                     Примечание к оплате
                   </label>
                   <input
@@ -540,7 +501,7 @@ export const LessonModal: React.FC<LessonModalProps> = ({
                     value={paymentNote}
                     onChange={(e) => setPaymentNote(e.target.value)}
                     placeholder="Например: Абонемент, перевод СБП..."
-                    className="w-full px-3 py-1.5 text-sm bg-white border border-slate-300 rounded-lg"
+                    className="field-input"
                   />
                 </div>
               </div>
@@ -548,7 +509,7 @@ export const LessonModal: React.FC<LessonModalProps> = ({
           </div>
 
           {/* Modal Sticky Footer Actions */}
-          <div className="px-6 py-3.5 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3 shrink-0">
+          <div className="modal-footer">
             <div>
               {initialLesson && (
                 <>
@@ -556,28 +517,28 @@ export const LessonModal: React.FC<LessonModalProps> = ({
                     <button
                       type="button"
                       onClick={() => setConfirmDelete(true)}
-                      className="px-3 py-2 text-xs font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+                      className="btn-danger-ghost"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <Trash2 className="icon-sm" />
                       <span>Удалить урок</span>
                     </button>
                   ) : (
-                    <div className="inline-flex items-center gap-2">
-                      <span className="text-xs text-rose-700 font-medium">Удалить запись?</span>
+                    <div className="delete-confirm-inline">
+                      <span className="text-unpaid">Удалить запись?</span>
                       <button
                         type="button"
                         onClick={() => {
                           onDeleteLesson(initialLesson.id);
                           onClose();
                         }}
-                        className="px-2.5 py-1.5 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-md cursor-pointer"
+                        className="btn-danger-solid"
                       >
                         Да, удалить
                       </button>
                       <button
                         type="button"
                         onClick={() => setConfirmDelete(false)}
-                        className="px-2 py-1.5 text-xs text-slate-600 hover:text-slate-900 cursor-pointer"
+                        className="btn-link-muted"
                       >
                         Отмена
                       </button>
@@ -587,19 +548,12 @@ export const LessonModal: React.FC<LessonModalProps> = ({
               )}
             </div>
 
-            <div className="flex items-center gap-2.5 ml-auto">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-2 text-xs sm:text-sm font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
-              >
+            <div className="modal-actions-group">
+              <button type="button" onClick={onClose} className="btn-secondary">
                 Отмена
               </button>
-              <button
-                type="submit"
-                className="px-5 py-2 text-xs sm:text-sm font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-lg transition-colors inline-flex items-center gap-1.5 cursor-pointer"
-              >
-                <CheckCircle2 className="w-4 h-4" />
+              <button type="submit" className="btn-primary">
+                <CheckCircle2 className="icon-sm" />
                 <span>Сохранить</span>
               </button>
             </div>

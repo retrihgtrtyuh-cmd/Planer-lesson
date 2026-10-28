@@ -481,6 +481,102 @@
       .getElementById('open-students-btn-mobile')
       .addEventListener('click', handleOpenStudents);
 
+    // Header search & settings drawer toggles + brand sub-links + bottom tab bar
+    var settingsDrawer = document.getElementById('toolbar-settings-drawer');
+    var searchToggleBtn = document.getElementById('header-search-toggle-btn');
+    var menuToggleBtn = document.getElementById('header-menu-toggle-btn');
+
+    function toggleSettingsDrawer(forceOpen) {
+      if (!settingsDrawer) return;
+      var willOpen =
+        typeof forceOpen === 'boolean'
+          ? forceOpen
+          : !settingsDrawer.classList.contains('is-open');
+      if (willOpen) {
+        settingsDrawer.classList.add('is-open');
+      } else {
+        settingsDrawer.classList.remove('is-open');
+      }
+    }
+
+    if (searchToggleBtn) {
+      searchToggleBtn.addEventListener('click', function () {
+        toggleSettingsDrawer();
+        var dateFilterEl = document.getElementById('exact-date-filter');
+        if (
+          settingsDrawer &&
+          settingsDrawer.classList.contains('is-open') &&
+          dateFilterEl
+        ) {
+          dateFilterEl.focus();
+        }
+      });
+    }
+
+    if (menuToggleBtn) {
+      menuToggleBtn.addEventListener('click', function () {
+        toggleSettingsDrawer();
+      });
+    }
+
+    function setActiveBottomTab(tabKey) {
+      var tabs = document.querySelectorAll('.bottom-tab-item[data-bottom-nav]');
+      for (var t = 0; t < tabs.length; t++) {
+        var isMatch = tabs[t].getAttribute('data-bottom-nav') === tabKey;
+        if (isMatch) {
+          tabs[t].classList.add('active');
+        } else {
+          tabs[t].classList.remove('active');
+        }
+      }
+    }
+
+    function handleSectionNavigation(targetKey) {
+      if (targetKey === 'students') {
+        setActiveBottomTab('students');
+        handleOpenStudents();
+        return;
+      }
+      if (targetKey === 'stats') {
+        setActiveBottomTab('stats');
+        var statsSec = document.getElementById('stats-dashboard-section');
+        if (statsSec && typeof statsSec.scrollIntoView === 'function') {
+          statsSec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        return;
+      }
+      if (targetKey === 'settings') {
+        setActiveBottomTab('settings');
+        toggleSettingsDrawer(true);
+        if (settingsDrawer && typeof settingsDrawer.scrollIntoView === 'function') {
+          settingsDrawer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+        return;
+      }
+      // Default: planner
+      setActiveBottomTab('planner');
+      var schedEl = document.getElementById('schedule');
+      if (schedEl && typeof schedEl.scrollIntoView === 'function') {
+        schedEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
+
+    var brandSubBtns = document.querySelectorAll('[data-nav-action]');
+    for (var b = 0; b < brandSubBtns.length; b++) {
+      brandSubBtns[b].addEventListener('click', function (e) {
+        var target = e.currentTarget.getAttribute('data-nav-action');
+        handleSectionNavigation(target);
+      });
+    }
+
+    var bottomNavBtns = document.querySelectorAll('.bottom-tab-item[data-bottom-nav]');
+    for (var n = 0; n < bottomNavBtns.length; n++) {
+      bottomNavBtns[n].addEventListener('click', function (e) {
+        var target = e.currentTarget.getAttribute('data-bottom-nav');
+        handleSectionNavigation(target);
+      });
+    }
+
     // Open AutoTransfer Modal if legacy trigger exists
     var openAutoBtn = document.getElementById('open-autotransfer-btn');
     var openAutoMobileBtn = document.getElementById('open-autotransfer-btn-mobile');

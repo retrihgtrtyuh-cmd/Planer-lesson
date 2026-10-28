@@ -20,92 +20,125 @@ export const DashboardStrip: React.FC<DashboardStripProps> = ({
   onClearFilters,
 }) => {
   const hasActiveFilter = subjectFilter !== 'all' || Boolean(exactDateFilter);
+  const plannedLessons = Math.max(0, stats.totalActiveLessons - stats.completedLessons);
 
   return (
     <section
       aria-label="Сводка за выбранную неделю"
-      className="max-w-[1440px] w-full mx-auto px-4 sm:px-6 pt-4 pb-2"
+      className="container-wide dashboard-section"
     >
-      <div className="bg-white border border-slate-200 rounded-xl px-4 sm:px-6 py-3.5 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        {/* Left: Lesson counts */}
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-          <div>
-            <span className="text-xs text-slate-500 block">Всего уроков на неделе</span>
-            <div className="flex items-baseline gap-2.5 mt-0.5">
+      <div className="kpi-cards-grid">
+        {/* Card 1: Всего уроков на неделю */}
+        <div className="kpi-stat-card">
+          <div className="kpi-icon-circle kpi-icon-slate" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="currentColor" className="kpi-svg">
+              <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z" />
+            </svg>
+          </div>
+          <div className="kpi-card-content">
+            <span className="kpi-card-label">
+              Всего уроков
+              <br />
+              на неделю
+            </span>
+            <div className="kpi-card-value-row font-mono-tabular">
               <span
-                className="text-lg font-bold text-slate-900 font-mono-tabular"
+                className="kpi-big-number kpi-color-dark"
                 data-testid="dashboard-total-lessons"
               >
                 {stats.totalActiveLessons}
               </span>
-              <span className="text-xs text-slate-600 font-mono-tabular">
-                Англ: <strong className="text-blue-700">{stats.engLessons}</strong>
-                <span aria-hidden="true" className="mx-1.5 text-slate-300">
-                  ·
-                </span>
-                Рус: <strong className="text-emerald-700">{stats.rusLessons}</strong>
+              <span className="kpi-inline-sub">
+                ENG: <strong>{stats.engLessons}</strong> · RUS: <strong>{stats.rusLessons}</strong>
               </span>
             </div>
           </div>
+        </div>
 
-          <div className="hidden sm:block h-8 w-px bg-slate-200" aria-hidden="true" />
-
-          <div>
-            <span className="text-xs text-slate-500 block">Статус проведения</span>
-            <div className="text-xs text-slate-700 font-mono-tabular mt-1">
-              Проведено: <strong className="text-slate-900">{stats.completedLessons}</strong> из{' '}
-              {stats.totalActiveLessons}
-              {stats.cancelledLessons > 0 && (
-                <>
-                  <span aria-hidden="true" className="mx-1.5 text-slate-300">
-                    ·
-                  </span>
-                  <span className="text-slate-500">Отменено: {stats.cancelledLessons}</span>
-                </>
-              )}
+        {/* Card 2: Проведено */}
+        <div className="kpi-stat-card">
+          <div className="kpi-icon-circle kpi-icon-green" aria-hidden="true">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="3"
+              className="kpi-svg"
+            >
+              <polyline points="20 6 9 17 4 12" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
+          <div className="kpi-card-content">
+            <span className="kpi-card-label">Проведено</span>
+            <div className="kpi-card-value-row font-mono-tabular">
+              <span className="kpi-big-number kpi-color-green">{stats.completedLessons}</span>
+            </div>
+            <div
+              className="kpi-micro-note text-paid font-mono-tabular"
+              data-testid="dashboard-paid-amount"
+            >
+              Оплачено: {formatCurrencyRUB(stats.paidAmount)}
             </div>
           </div>
+        </div>
 
-          {hasActiveFilter && (
-            <>
-              <div className="hidden sm:block h-8 w-px bg-slate-200" aria-hidden="true" />
-              <div className="flex items-center gap-2 text-xs">
-                <span className="text-slate-600">
+        {/* Card 3: Запланировано */}
+        <div className="kpi-stat-card">
+          <div className="kpi-icon-circle kpi-icon-blue" aria-hidden="true">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.4"
+              className="kpi-svg"
+            >
+              <circle cx="12" cy="12" r="9" />
+              <polyline points="12 7 12 12 15.5 14" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
+          <div className="kpi-card-content">
+            <span className="kpi-card-label">Запланировано</span>
+            <div className="kpi-card-value-row font-mono-tabular">
+              <span className="kpi-big-number kpi-color-blue">{plannedLessons}</span>
+            </div>
+            {hasActiveFilter && (
+              <div className="kpi-micro-note">
+                <span>
                   Фильтр:{' '}
-                  <strong className="text-slate-900">
+                  <strong>
                     {subjectFilter === 'eng'
-                      ? 'Английский'
+                      ? 'ENG'
                       : subjectFilter === 'rus'
-                      ? 'Русский'
-                      : 'Все предметы'}
-                    {exactDateFilter ? `, ${formatRussianDate(exactDateFilter)}` : ''}
+                      ? 'RUS'
+                      : 'Все'}
+                    {exactDateFilter ? `, ${formatRussianDate(exactDateFilter, false)}` : ''}
                   </strong>
                 </span>
                 <button
                   type="button"
                   onClick={onClearFilters}
-                  className="text-blue-700 hover:underline font-medium cursor-pointer whitespace-nowrap"
+                  className="kpi-reset-btn"
                 >
                   Сбросить
                 </button>
               </div>
-            </>
-          )}
+            )}
+          </div>
         </div>
 
-        {/* Right: Financial metrics */}
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 pt-2 md:pt-0 border-t md:border-t-0 border-slate-100">
-          <div>
-            <span className="text-xs text-slate-500 block">Финансы за неделю</span>
-            <div className="flex flex-wrap items-center gap-3 mt-0.5 text-sm font-mono-tabular">
-              <span className="text-emerald-700 font-semibold" data-testid="dashboard-paid-amount">
-                Оплачено: {formatCurrencyRUB(stats.paidAmount)}
-              </span>
-              <span aria-hidden="true" className="text-slate-300">
-                |
-              </span>
-              <span className="text-rose-600 font-semibold" data-testid="dashboard-unpaid-amount">
-                Ожидает оплаты: {formatCurrencyRUB(stats.unpaidAmount)}
+        {/* Card 4: Не оплачено */}
+        <div className="kpi-stat-card">
+          <div className="kpi-icon-circle kpi-icon-red" aria-hidden="true">
+            <span className="kpi-exclamation">!</span>
+          </div>
+          <div className="kpi-card-content">
+            <span className="kpi-card-label kpi-label-red">Не оплачено</span>
+            <div className="kpi-card-value-row font-mono-tabular">
+              <span
+                className="kpi-big-number kpi-color-red"
+                data-testid="dashboard-unpaid-amount"
+              >
+                {formatCurrencyRUB(stats.unpaidAmount)}
               </span>
             </div>
           </div>
