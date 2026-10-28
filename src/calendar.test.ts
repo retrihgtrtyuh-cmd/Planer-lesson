@@ -18,12 +18,14 @@ test('getMondayOfWeek returns Monday for any day of week (including Sunday)', ()
   assert.equal(Calendar.getMondayOfWeek('2026-10-26'), '2026-10-26');
 });
 
-test('addMinutesToTime defaults to 1 hour (60 min) and supports custom durations', () => {
+test('addMinutesToTime defaults to 1 hour (60 min) and supports custom durations and formatCurrency', () => {
   assert.equal(Calendar.addMinutesToTime('15:00', 60), '16:00');
   assert.equal(Calendar.addMinutesToTime('15:00'), '16:00');
   assert.equal(Calendar.addMinutesToTime('15:30', 45), '16:15');
   assert.equal(Calendar.addMinutesToTime('15:00', 90), '16:30');
   assert.equal(Calendar.getDurationMinutes('15:00', '16:00'), 60);
+  assert.equal(Calendar.formatCurrency(1800), '1 800 ₽');
+  assert.equal(Calendar.formatCurrency(0), '0 ₽');
 });
 
 test('isLessonInPast and autoCompletePastLessons automatically mark past planned lessons as completed', () => {

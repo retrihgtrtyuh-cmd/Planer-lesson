@@ -116,6 +116,17 @@
   }
 
   /**
+   * Formats a number as Russian rubles (e.g. 1800 -> "1 800 ₽", 0 -> "0 ₽").
+   */
+  function formatCurrency(amount) {
+    var num =
+      typeof amount === 'number' && !isNaN(amount)
+        ? Math.round(amount)
+        : Math.round(Number(amount) || 0);
+    return String(num).replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' ₽';
+  }
+
+  /**
    * Checks if a lesson's date and endTime are in the past relative to `now`.
    * `now` can be a Date instance, an ISO timestamp string, or undefined (defaults to new Date()).
    */
@@ -1117,6 +1128,7 @@
     timeStrToMinutes: timeStrToMinutes,
     getDurationMinutes: getDurationMinutes,
     formatTotalDurationCompact: formatTotalDurationCompact,
+    formatCurrency: formatCurrency,
     isLessonInPast: isLessonInPast,
     autoCompletePastLessons: autoCompletePastLessons,
     calculateDayWorkload: calculateDayWorkload,
