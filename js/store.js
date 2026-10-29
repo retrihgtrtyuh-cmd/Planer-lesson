@@ -2,10 +2,12 @@
   'use strict';
 
   var STORAGE_KEYS = {
-    STUDENTS: 'tutor_planner_students_v2',
-    LESSONS: 'tutor_planner_lessons_v2',
-    INITIALIZED: 'tutor_planner_initialized_v2',
-    LAST_MONTH_ROLLOVER: 'tutor_planner_last_month_rollover',
+    STUDENTS: 'tutor_planner_students_v3',
+    LESSONS: 'tutor_planner_lessons_v3',
+    DELETED_IDS: 'tutor_planner_deleted_ids_v3',
+    INITIALIZED: 'tutor_planner_initialized_v3',
+    LAST_MONTH_ROLLOVER: 'tutor_planner_last_month_rollover_v3',
+    PAIRED_DEVICE: 'tutor_planner_paired_device_v3',
   };
 
   var STUDENT_COLORS = [
@@ -30,7 +32,9 @@
     } catch (e) {
       // Fallback to in-memory storage on file:// security restrictions
     }
-    return Object.prototype.hasOwnProperty.call(memoryStorage, key) ? memoryStorage[key] : null;
+    return Object.prototype.hasOwnProperty.call(memoryStorage, key)
+      ? memoryStorage[key]
+      : null;
   }
 
   function safeSetItem(key, value) {
@@ -44,327 +48,106 @@
     }
   }
 
+  function safeRemoveItem(key) {
+    delete memoryStorage[key];
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        window.localStorage.removeItem(key);
+      }
+    } catch (e) {
+      // Ignore security errors
+    }
+  }
+
   function createId(prefix) {
     var p = prefix || 'id';
     return p + '_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
   }
 
-  function pad2(n) {
-    return String(n).padStart(2, '0');
+  /**
+   * Returns a clean empty initial database without any fictional students, prices, or lessons
+   * so a freshly installed app is ready for immediate synchronization or user entry.
+   */
+  function createInitialDemoData() {
+    return {
+      students: [],
+      lessons: [],
+      deletedIds: [],
+    };
   }
 
-  function toISODateLocal(date) {
-    return (
-      date.getFullYear() +
-      '-' +
-      pad2(date.getMonth() + 1) +
-      '-' +
-      pad2(date.getDate())
-    );
+  function normalizeDeletedIds(deletedIds) {
+    if (!Array.isArray(deletedIds)) return [];
+    var map = {};
+    for (var i = 0; i < deletedIds.length; i++) {
+      var item = deletedIds[i];
+      if (!item || !item.id) continue;
+      var idStr = String(item.id);
+      var ts = Number(item.deletedAt) || Date.now();
+      if (!map[idStr] || ts > map[idStr]) {
+        map[idStr] = ts;
+      }
+    }
+    var keys = Object.keys(map);
+    var result = [];
+    for (var k = 0; k < keys.length; k++) {
+      result.push({
+        id: keys[k],
+        deletedAt: map[keys[k]],
+      });
+    }
+    return result;
   }
 
-  function parseISODateLocal(dateStr) {
-    var parts = String(dateStr || '').split('-').map(Number);
-    return new Date(parts[0] || 2026, (parts[1] || 1) - 1, parts[2] || 1, 12, 0, 0, 0);
+  function recordDeletedIds(existingDeletedIds, idsToAdd, deletedAtTimestamp) {
+    var ts = Number(deletedAtTimestamp) || Date.now();
+    var combined = (existingDeletedIds || []).slice();
+    var list = Array.isArray(idsToAdd) ? idsToAdd : [idsToAdd];
+    for (var i = 0; i < list.length; i++) {
+      if (list[i]) {
+        combined.push({
+          id: String(list[i]),
+          deletedAt: ts,
+        });
+      }
+    }
+    return normalizeDeletedIds(combined);
   }
 
-  function getMondayLocal(dateStr) {
-    var d = dateStr ? parseISODateLocal(dateStr) : new Date();
-    d.setHours(12, 0, 0, 0);
-    var day = d.getDay();
-    var diff = day === 0 ? -6 : 1 - day;
-    d.setDate(d.getDate() + diff);
-    return toISODateLocal(d);
-  }
-
-  function addDaysLocal(dateStr, days) {
-    var d = parseISODateLocal(dateStr);
-    d.setDate(d.getDate() + days);
-    return toISODateLocal(d);
-  }
-
-  function createInitialDemoData(todayISO) {
-    var nowISO = todayISO || toISODateLocal(new Date());
-    var currentMonday = getMondayLocal(nowISO);
-    var prevMonday = addDaysLocal(currentMonday, -7);
-
-    var students = [
-      {
-        id: 'stu_1',
-        name: 'Алина Соколова',
-        defaultSubject: 'eng',
-        defaultPrice: 1800,
-        color: '#3b82f6',
-        notes: 'Уровень B2 (Upper-Intermediate). Подготовка к IELTS Academic, цель 7.5. Учебник: Mindset for IELTS 2.',
-        teacherNote: 'Контролировать тайминг на Writing Task 2 (не более 40 минут). Отрабатывать связки контраста.',
-        teacherNoteActive: true,
-      },
-      {
-        id: 'stu_2',
-        name: 'Максим Морозов',
-        defaultSubject: 'rus',
-        defaultPrice: 1600,
-        color: '#10b981',
-        notes: '11 класс, подготовка к ЕГЭ по русскому языку. Особый упор на задания 8, 16–21 и структуру сочинения.',
-        teacherNote: 'Каждый урок начинать с 5-минутной разминки по ударениям (задание 4 ЕГЭ) и паронимам.',
-        teacherNoteActive: true,
-      },
-      {
-        id: 'stu_3',
-        name: 'София Лебедева',
-        defaultSubject: 'eng',
-        defaultPrice: 1500,
-        color: '#8b5cf6',
-        notes: 'Уровень B1, 9 класс. Разговорный практикум, расширение словарного запаса (Outcomes Intermediate).',
-        teacherNote: 'Проверить долг по устному пересказу топика Travel & Accommodation.',
-        teacherNoteActive: true,
-      },
-      {
-        id: 'stu_4',
-        name: 'Артем Ковалев',
-        defaultSubject: 'rus',
-        defaultPrice: 1400,
-        color: '#f59e0b',
-        notes: '8 класс. Повышение успеваемости, причастные и деепричастные обороты, правописание Н и НН.',
-        teacherNote: '',
-        teacherNoteActive: false,
-      },
-    ];
-
-    var lessons = [
-      {
-        id: 'les_prev_1',
-        studentId: 'stu_1',
-        date: addDaysLocal(prevMonday, 0),
-        startTime: '15:00',
-        endTime: '16:00',
-        subject: 'eng',
-        status: 'completed',
-        price: 1800,
-        classwork: 'Unit 4: Academic Writing Task 1 (Line graphs & bar charts). Разбор структуры описания трендов.',
-        homework: 'Написать отчет по графику стр. 48 (150+ слов), выучить 15 глаголов движения трендов.',
-        hwChecked: true,
-        isPaid: true,
-        paymentNote: 'Перевод на карту',
-        teacherNote: 'Контролировать тайминг на Writing Task 2 (не более 40 минут).',
-        teacherNoteActive: true,
-      },
-      {
-        id: 'les_prev_2',
-        studentId: 'stu_2',
-        date: addDaysLocal(prevMonday, 1),
-        startTime: '17:00',
-        endTime: '18:00',
-        subject: 'rus',
-        status: 'completed',
-        price: 1600,
-        classwork: 'Задание 27 ЕГЭ: формулировка авторской позиции и связка примеров-иллюстраций.',
-        homework: 'Написать вступление и комментарий по тексту К. Паустовского (вариант 12), прорешать задания 9–15.',
-        hwChecked: true,
-        isPaid: true,
-        paymentNote: 'Абонемент (3 из 4)',
-        teacherNote: 'Каждый урок начинать с 5-минутной разминки по ударениям (задание 4 ЕГЭ) и паронимам.',
-        teacherNoteActive: true,
-      },
-      {
-        id: 'les_prev_3',
-        studentId: 'stu_3',
-        date: addDaysLocal(prevMonday, 2),
-        startTime: '16:00',
-        endTime: '17:00',
-        subject: 'eng',
-        status: 'completed',
-        price: 1500,
-        classwork: 'Present Perfect vs Past Simple в живых диалогах. Аудирование Unit 3.',
-        homework: 'Workbook p. 24 ex. 1-4, записать голосовое сообщение на 2 минуты о поездке.',
-        hwChecked: true,
-        isPaid: true,
-        paymentNote: 'Оплачено после урока',
-        teacherNote: 'Проверить долг по устному пересказу топика Travel & Accommodation.',
-        teacherNoteActive: true,
-      },
-      {
-        id: 'les_prev_4',
-        studentId: 'stu_4',
-        date: addDaysLocal(prevMonday, 3),
-        startTime: '16:30',
-        endTime: '17:30',
-        subject: 'rus',
-        status: 'completed',
-        price: 1400,
-        classwork: 'Обособление определений, выраженных причастным оборотом.',
-        homework: 'Упр. 142 (выписать 10 предложений, выделить графически причастные обороты).',
-        hwChecked: false,
-        isPaid: true,
-        paymentNote: 'СБП',
-        teacherNote: '',
-        teacherNoteActive: false,
-      },
-      {
-        id: 'les_curr_1',
-        studentId: 'stu_1',
-        date: addDaysLocal(currentMonday, 0),
-        startTime: '15:00',
-        endTime: '16:00',
-        subject: 'eng',
-        status: 'completed',
-        price: 1800,
-        classwork: 'Проверка отчета Writing Task 1. Переход к Speaking Part 2 (Technology & Education).',
-        homework: 'Эссе Writing Task 2 на тему дистанционного образования (250 слов) + карточка говорения.',
-        hwChecked: true,
-        isPaid: true,
-        paymentNote: 'СБП Т-Банк',
-        teacherNote: 'Контролировать тайминг на Writing Task 2 (не более 40 минут). Отрабатывать связки контраста.',
-        teacherNoteActive: true,
-      },
-      {
-        id: 'les_curr_2',
-        studentId: 'stu_3',
-        date: addDaysLocal(currentMonday, 0),
-        startTime: '17:00',
-        endTime: '18:00',
-        subject: 'eng',
-        status: 'completed',
-        price: 1500,
-        classwork: 'Разбор ошибок из Workbook. Тема Travel & Accommodation, ролевая игра в аэропорту.',
-        homework: 'Выучить фразовые глаголы (check in, set off, take off, get back), стр. 31 упр. 5.',
-        hwChecked: true,
-        isPaid: false,
-        paymentNote: 'Оплата в конце недели',
-        teacherNote: 'Проверить долг по устному пересказу топика Travel & Accommodation.',
-        teacherNoteActive: true,
-      },
-      {
-        id: 'les_curr_3',
-        studentId: 'stu_2',
-        date: addDaysLocal(currentMonday, 1),
-        startTime: '17:00',
-        endTime: '18:00',
-        subject: 'rus',
-        status: 'completed',
-        price: 1600,
-        classwork: 'Разбор сочинения по Паустовскому. Синтаксические нормы (задание 8 ЕГЭ) — ошибки с деепричастным оборотом.',
-        homework: 'Прорешать 25 прототипов задания 8 в рабочей тетради, исправить речевые ошибки в абзаце 3.',
-        hwChecked: true,
-        isPaid: true,
-        paymentNote: 'Абонемент (4 из 4)',
-        teacherNote: 'Каждый урок начинать с 5-минутной разминки по ударениям (задание 4 ЕГЭ) и паронимам.',
-        teacherNoteActive: true,
-      },
-      {
-        id: 'les_curr_4',
-        studentId: 'stu_4',
-        date: addDaysLocal(currentMonday, 2),
-        startTime: '16:00',
-        endTime: '17:00',
-        subject: 'rus',
-        status: 'planned',
-        price: 1400,
-        classwork: 'Правописание Н и НН в полных и кратких страдательных причастиях.',
-        homework: '',
-        hwChecked: false,
-        isPaid: false,
-        paymentNote: '',
-        teacherNote: '',
-        teacherNoteActive: false,
-      },
-      {
-        id: 'les_curr_5',
-        studentId: 'stu_1',
-        date: addDaysLocal(currentMonday, 3),
-        startTime: '15:00',
-        endTime: '16:00',
-        subject: 'eng',
-        status: 'planned',
-        price: 1800,
-        classwork: 'IELTS Reading: True / False / Not Given стратегии быстрого сканирования текста.',
-        homework: 'Cambridge IELTS 18 Test 2 Reading Passage 1 & 2 с таймером (40 мин).',
-        hwChecked: false,
-        isPaid: true,
-        paymentNote: 'Предоплата',
-        teacherNote: 'Контролировать тайминг на Writing Task 2 (не более 40 минут). Отрабатывать связки контраста.',
-        teacherNoteActive: true,
-      },
-      {
-        id: 'les_curr_6',
-        studentId: 'stu_2',
-        date: addDaysLocal(currentMonday, 4),
-        startTime: '16:30',
-        endTime: '17:30',
-        subject: 'rus',
-        status: 'planned',
-        price: 1600,
-        classwork: 'Пунктуация в сложноподчиненном и бессоюзном предложении (задания 19–21 ЕГЭ).',
-        homework: '',
-        hwChecked: false,
-        isPaid: false,
-        paymentNote: 'Новый абонемент со следующей недели',
-        teacherNote: 'Каждый урок начинать с 5-минутной разминки по ударениям (задание 4 ЕГЭ) и паронимам.',
-        teacherNoteActive: true,
-      },
-      {
-        id: 'les_curr_7',
-        studentId: 'stu_3',
-        date: addDaysLocal(currentMonday, 4),
-        startTime: '18:30',
-        endTime: '19:30',
-        subject: 'eng',
-        status: 'cancelled',
-        price: 1500,
-        classwork: 'Отмена по просьбе родителей (школьная олимпиада).',
-        homework: '',
-        hwChecked: false,
-        isPaid: false,
-        paymentNote: 'Перенос не требуется',
-        teacherNote: 'Проверить долг по устному пересказу топика Travel & Accommodation.',
-        teacherNoteActive: true,
-      },
-      {
-        id: 'les_curr_8',
-        studentId: 'stu_4',
-        date: addDaysLocal(currentMonday, 5),
-        startTime: '11:00',
-        endTime: '12:00',
-        subject: 'rus',
-        status: 'planned',
-        price: 1400,
-        classwork: 'Контрольный диктант с грамматическим заданием по теме «Причастие и деепричасте».',
-        homework: '',
-        hwChecked: false,
-        isPaid: true,
-        paymentNote: 'Оплачено заранее',
-        teacherNote: '',
-        teacherNoteActive: false,
-      },
-    ];
-
-    return { students: students, lessons: lessons };
-  }
-
-  function normalizeStateEntities(students, lessons, now) {
+  function normalizeStateEntities(students, lessons, now, deletedIds) {
     var Calendar = root.TutorPlanner && root.TutorPlanner.Calendar;
     var stuPriceMap = {};
     var normalizedStudents = (students || []).map(function (s, idx) {
       var rawPrice = s && s.defaultPrice != null ? Number(s.defaultPrice) : NaN;
-      var defaultPrice = !isNaN(rawPrice) && rawPrice >= 0 ? rawPrice : 1500;
+      var defaultPrice = !isNaN(rawPrice) && rawPrice >= 0 ? rawPrice : 0;
       var color =
         s && typeof s.color === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(s.color.trim())
           ? s.color.trim()
           : STUDENT_COLORS[idx % STUDENT_COLORS.length];
+      var updatedAt =
+        s && typeof s.updatedAt === 'number' && !isNaN(s.updatedAt) && s.updatedAt > 0
+          ? s.updatedAt
+          : 1;
       stuPriceMap[s.id] = defaultPrice;
       return Object.assign({}, s, {
         defaultPrice: defaultPrice,
         color: color,
+        updatedAt: updatedAt,
       });
     });
 
     var normalizedLessons = (lessons || []).map(function (l) {
       var rawPrice = l && l.price != null ? Number(l.price) : NaN;
       var fallbackPrice =
-        stuPriceMap[l.studentId] != null ? stuPriceMap[l.studentId] : 1500;
+        stuPriceMap[l.studentId] != null ? stuPriceMap[l.studentId] : 0;
       var price = !isNaN(rawPrice) && rawPrice >= 0 ? rawPrice : fallbackPrice;
+      var updatedAt =
+        l && typeof l.updatedAt === 'number' && !isNaN(l.updatedAt) && l.updatedAt > 0
+          ? l.updatedAt
+          : 1;
       return Object.assign({}, l, {
         price: price,
+        updatedAt: updatedAt,
       });
     });
 
@@ -376,12 +159,31 @@
     return {
       students: normalizedStudents,
       lessons: normalizedLessons,
+      deletedIds: normalizeDeletedIds(deletedIds || loadDeletedIds()),
     };
   }
 
-  function savePlannerState(students, lessons) {
+  function loadDeletedIds() {
+    try {
+      var raw = safeGetItem(STORAGE_KEYS.DELETED_IDS);
+      return raw ? normalizeDeletedIds(JSON.parse(raw)) : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function saveDeletedIds(deletedIds) {
+    var norm = normalizeDeletedIds(deletedIds);
+    safeSetItem(STORAGE_KEYS.DELETED_IDS, JSON.stringify(norm));
+    return norm;
+  }
+
+  function savePlannerState(students, lessons, deletedIds) {
     safeSetItem(STORAGE_KEYS.STUDENTS, JSON.stringify(students || []));
     safeSetItem(STORAGE_KEYS.LESSONS, JSON.stringify(lessons || []));
+    if (Array.isArray(deletedIds)) {
+      saveDeletedIds(deletedIds);
+    }
     safeSetItem(STORAGE_KEYS.INITIALIZED, 'true');
   }
 
@@ -389,54 +191,50 @@
     try {
       var rawStudents = safeGetItem(STORAGE_KEYS.STUDENTS);
       var rawLessons = safeGetItem(STORAGE_KEYS.LESSONS);
+      var rawDeleted = safeGetItem(STORAGE_KEYS.DELETED_IDS);
       var initialized = safeGetItem(STORAGE_KEYS.INITIALIZED);
 
       if (!initialized && !rawStudents && !rawLessons) {
-        var demo = createInitialDemoData();
-        var normDemo = normalizeStateEntities(demo.students, demo.lessons);
-        savePlannerState(normDemo.students, normDemo.lessons);
-        return normDemo;
+        var emptyInit = createInitialDemoData();
+        savePlannerState(emptyInit.students, emptyInit.lessons, emptyInit.deletedIds);
+        return emptyInit;
       }
 
       var students = rawStudents ? JSON.parse(rawStudents) : [];
       var lessons = rawLessons ? JSON.parse(rawLessons) : [];
+      var deletedIds = rawDeleted ? JSON.parse(rawDeleted) : [];
 
-      if (students.length === 0 && lessons.length === 0 && !initialized) {
-        var fallbackDemo = createInitialDemoData();
-        var normFallback = normalizeStateEntities(
-          fallbackDemo.students,
-          fallbackDemo.lessons
-        );
-        savePlannerState(normFallback.students, normFallback.lessons);
-        return normFallback;
-      }
-
-      var normalized = normalizeStateEntities(students, lessons);
-      savePlannerState(normalized.students, normalized.lessons);
+      var normalized = normalizeStateEntities(students, lessons, undefined, deletedIds);
+      savePlannerState(normalized.students, normalized.lessons, normalized.deletedIds);
       return normalized;
     } catch (e) {
-      var emergencyDemo = createInitialDemoData();
-      return normalizeStateEntities(emergencyDemo.students, emergencyDemo.lessons);
+      return createInitialDemoData();
     }
   }
 
-  function serializeDatabaseBackup(students, lessons) {
+  function serializeDatabaseBackup(students, lessons, deletedIds) {
+    var delList = Array.isArray(deletedIds) ? normalizeDeletedIds(deletedIds) : loadDeletedIds();
     return JSON.stringify(
       {
-        version: 3,
+        version: 4,
         exportedAt: new Date().toISOString(),
-        students: students,
-        lessons: lessons,
+        students: students || [],
+        lessons: lessons || [],
+        deletedIds: delList,
       },
       null,
       2
     );
   }
 
-  function parseDatabaseBackupJSON(jsonString) {
-    var parsed = JSON.parse(jsonString);
+  function parseDatabaseBackupJSON(jsonStringOrObject) {
+    var parsed =
+      typeof jsonStringOrObject === 'string'
+        ? JSON.parse(jsonStringOrObject)
+        : jsonStringOrObject;
+
     if (!parsed || !Array.isArray(parsed.students) || !Array.isArray(parsed.lessons)) {
-      throw new Error('Некорректный формат файла: отсутствуют массивы students или lessons.');
+      throw new Error('Некорректный формат данных синхронизации.');
     }
 
     var stuPriceMap = {};
@@ -447,11 +245,15 @@
       var id = String(s.id || createId('stu'));
       var tNote = typeof s.teacherNote === 'string' ? s.teacherNote : '';
       var rawPrice = s.defaultPrice != null ? Number(s.defaultPrice) : NaN;
-      var defaultPrice = !isNaN(rawPrice) && rawPrice >= 0 ? rawPrice : 1500;
+      var defaultPrice = !isNaN(rawPrice) && rawPrice >= 0 ? rawPrice : 0;
       var color =
         typeof s.color === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(s.color.trim())
           ? s.color.trim()
           : STUDENT_COLORS[idx % STUDENT_COLORS.length];
+      var updatedAt =
+        typeof s.updatedAt === 'number' && !isNaN(s.updatedAt) && s.updatedAt > 0
+          ? s.updatedAt
+          : 1;
       stuPriceMap[id] = defaultPrice;
       return {
         id: id,
@@ -463,6 +265,7 @@
         teacherNote: tNote,
         teacherNoteActive:
           typeof s.teacherNoteActive === 'boolean' ? s.teacherNoteActive : Boolean(tNote),
+        updatedAt: updatedAt,
       };
     });
 
@@ -477,8 +280,12 @@
       var tNote = typeof l.teacherNote === 'string' ? l.teacherNote : '';
       var sid = String(l.studentId || '');
       var rawPrice = l.price != null ? Number(l.price) : NaN;
-      var fallbackPrice = stuPriceMap[sid] != null ? stuPriceMap[sid] : 1500;
+      var fallbackPrice = stuPriceMap[sid] != null ? stuPriceMap[sid] : 0;
       var price = !isNaN(rawPrice) && rawPrice >= 0 ? rawPrice : fallbackPrice;
+      var updatedAt =
+        typeof l.updatedAt === 'number' && !isNaN(l.updatedAt) && l.updatedAt > 0
+          ? l.updatedAt
+          : 1;
       return {
         id: String(l.id || createId('les')),
         studentId: sid,
@@ -499,10 +306,206 @@
         repeatWeekly: l.repeatWeekly !== false,
         seriesId: typeof l.seriesId === 'string' ? l.seriesId : '',
         autoGenerated: Boolean(l.autoGenerated),
+        updatedAt: updatedAt,
       };
     });
 
-    return normalizeStateEntities(validStudents, validLessons);
+    var validDeletedIds = normalizeDeletedIds(parsed.deletedIds || []);
+
+    return normalizeStateEntities(validStudents, validLessons, undefined, validDeletedIds);
+  }
+
+  /**
+   * Smart Merge (Умное двустороннее слияние баз данных):
+   * - Can be called as mergeSyncData(incomingData) or mergeSyncData(localData, incomingData).
+   * - Respects deletedIds [{ id, deletedAt }] so deleted lessons/students never resurrect.
+   * - Adds missing records by id.
+   * - Resolves conflicts on records present on both devices by keeping the one with greater updatedAt.
+   * - Returns merged state + human-readable Russian summary report.
+   */
+  function mergeSyncData(localOrIncoming, optionalIncoming) {
+    var localState;
+    var rawIncoming;
+
+    if (arguments.length >= 2 && optionalIncoming !== undefined) {
+      localState = localOrIncoming || loadPlannerState();
+      rawIncoming = optionalIncoming;
+    } else {
+      localState = loadPlannerState();
+      rawIncoming = localOrIncoming;
+    }
+
+    var incomingParsed = parseDatabaseBackupJSON(rawIncoming);
+
+    var localStudents = Array.isArray(localState.students) ? localState.students : [];
+    var localLessons = Array.isArray(localState.lessons) ? localState.lessons : [];
+    var localDeleted = Array.isArray(localState.deletedIds)
+      ? localState.deletedIds
+      : loadDeletedIds();
+
+    var mergedDeletedList = normalizeDeletedIds(
+      localDeleted.concat(incomingParsed.deletedIds || [])
+    );
+    var deletedMap = {};
+    for (var d = 0; d < mergedDeletedList.length; d++) {
+      deletedMap[mergedDeletedList[d].id] = mergedDeletedList[d].deletedAt;
+    }
+
+    function isDeletedEntity(entity) {
+      if (!entity || !entity.id) return true;
+      var delAt = deletedMap[entity.id];
+      if (!delAt) return false;
+      var updAt = Number(entity.updatedAt) || 0;
+      return updAt <= delAt;
+    }
+
+    var addedStudents = 0;
+    var updatedStudents = 0;
+    var addedLessons = 0;
+    var updatedLessons = 0;
+
+    // 1. Merge Students by id
+    var studentMap = {};
+    var studentOrder = [];
+
+    for (var i = 0; i < localStudents.length; i++) {
+      var locStu = localStudents[i];
+      if (!locStu || !locStu.id) continue;
+      if (isDeletedEntity(locStu)) continue;
+      studentMap[locStu.id] = Object.assign({}, locStu, {
+        updatedAt: Number(locStu.updatedAt) || 1,
+      });
+      studentOrder.push(locStu.id);
+    }
+
+    var incomingStudents = incomingParsed.students || [];
+    for (var j = 0; j < incomingStudents.length; j++) {
+      var incStu = incomingStudents[j];
+      if (!incStu || !incStu.id) continue;
+      if (isDeletedEntity(incStu)) continue;
+
+      var existingStu = studentMap[incStu.id];
+      if (!existingStu) {
+        studentMap[incStu.id] = Object.assign({}, incStu, {
+          updatedAt: Number(incStu.updatedAt) || 1,
+        });
+        studentOrder.push(incStu.id);
+        addedStudents += 1;
+      } else {
+        var incStuTime = Number(incStu.updatedAt) || 1;
+        var locStuTime = Number(existingStu.updatedAt) || 1;
+        if (incStuTime > locStuTime) {
+          studentMap[incStu.id] = Object.assign({}, incStu, {
+            updatedAt: incStuTime,
+          });
+          updatedStudents += 1;
+        }
+      }
+    }
+
+    var mergedStudents = [];
+    for (var sIdx = 0; sIdx < studentOrder.length; sIdx++) {
+      var sid = studentOrder[sIdx];
+      if (studentMap[sid]) {
+        mergedStudents.push(studentMap[sid]);
+      }
+    }
+
+    // 2. Merge Lessons by id
+    var lessonMap = {};
+    var lessonOrder = [];
+
+    for (var l = 0; l < localLessons.length; l++) {
+      var locLes = localLessons[l];
+      if (!locLes || !locLes.id) continue;
+      if (isDeletedEntity(locLes)) continue;
+      if (deletedMap[locLes.studentId] && !studentMap[locLes.studentId]) continue;
+      lessonMap[locLes.id] = Object.assign({}, locLes, {
+        updatedAt: Number(locLes.updatedAt) || 1,
+      });
+      lessonOrder.push(locLes.id);
+    }
+
+    var incomingLessons = incomingParsed.lessons || [];
+    for (var m = 0; m < incomingLessons.length; m++) {
+      var incLes = incomingLessons[m];
+      if (!incLes || !incLes.id) continue;
+      if (isDeletedEntity(incLes)) continue;
+      if (deletedMap[incLes.studentId] && !studentMap[incLes.studentId]) continue;
+
+      var existingLes = lessonMap[incLes.id];
+      if (!existingLes) {
+        lessonMap[incLes.id] = Object.assign({}, incLes, {
+          updatedAt: Number(incLes.updatedAt) || 1,
+        });
+        lessonOrder.push(incLes.id);
+        addedLessons += 1;
+      } else {
+        var incLesTime = Number(incLes.updatedAt) || 1;
+        var locLesTime = Number(existingLes.updatedAt) || 1;
+        if (incLesTime > locLesTime) {
+          lessonMap[incLes.id] = Object.assign({}, incLes, {
+            updatedAt: incLesTime,
+          });
+          updatedLessons += 1;
+        }
+      }
+    }
+
+    var mergedLessons = [];
+    for (var lIdx = 0; lIdx < lessonOrder.length; lIdx++) {
+      var lid = lessonOrder[lIdx];
+      if (lessonMap[lid]) {
+        mergedLessons.push(lessonMap[lid]);
+      }
+    }
+
+    var normalized = normalizeStateEntities(
+      mergedStudents,
+      mergedLessons,
+      undefined,
+      mergedDeletedList
+    );
+
+    savePlannerState(
+      normalized.students,
+      normalized.lessons,
+      normalized.deletedIds
+    );
+
+    var totalStudentsChanged = addedStudents + updatedStudents;
+    var reportText =
+      'Добавлено уроков: ' +
+      addedLessons +
+      ', Обновлено: ' +
+      updatedLessons +
+      ', Учеников: ' +
+      totalStudentsChanged;
+
+    return {
+      students: normalized.students,
+      lessons: normalized.lessons,
+      deletedIds: normalized.deletedIds,
+      addedLessons: addedLessons,
+      updatedLessons: updatedLessons,
+      addedStudents: addedStudents,
+      updatedStudents: updatedStudents,
+      totalStudentsChanged: totalStudentsChanged,
+      reportText: reportText,
+    };
+  }
+
+  function getPairedDeviceCode() {
+    return safeGetItem(STORAGE_KEYS.PAIRED_DEVICE) || '';
+  }
+
+  function setPairedDeviceCode(code) {
+    var clean = String(code || '').replace(/\D/g, '').slice(0, 6);
+    if (clean.length === 6) {
+      safeSetItem(STORAGE_KEYS.PAIRED_DEVICE, clean);
+    } else if (!clean) {
+      safeRemoveItem(STORAGE_KEYS.PAIRED_DEVICE);
+    }
   }
 
   function getLastMonthRollover() {
@@ -516,14 +519,15 @@
   }
 
   /**
-   * Saves a new or edited lesson and automatically propagates clones to the end of its month
-   * (if repeatWeekly is enabled and status is planned or auto-completed because its date is in the past).
-   * Also automatically sets status = 'completed' if the saved lesson is in the past and status === 'planned'.
+   * Saves a new or edited lesson with updatedAt: Date.now() and automatically propagates
+   * clones to the end of its month if repeatWeekly is enabled.
    */
   function saveLessonWithAutoSync(students, lessons, lessonData, options) {
     var opts = options || {};
+    var nowTs = Date.now();
     var Calendar = root.TutorPlanner && root.TutorPlanner.Calendar;
     var currentLessons = (lessons || []).slice();
+    var currentDeletedIds = loadDeletedIds();
     var repeatWeekly = lessonData.repeatWeekly !== false;
 
     var studentObj = (students || []).find(function (s) {
@@ -535,7 +539,7 @@
         ? rawPrice
         : studentObj && typeof studentObj.defaultPrice === 'number'
         ? studentObj.defaultPrice
-        : 1500;
+        : 0;
 
     var requestedStatus = lessonData.status || 'planned';
     var effectiveStatus = requestedStatus;
@@ -564,6 +568,7 @@
       price: resolvedPrice,
       repeatWeekly: repeatWeekly,
       seriesId: seriesId,
+      updatedAt: nowTs,
     });
 
     var existingIndex = -1;
@@ -577,6 +582,7 @@
     }
 
     var updatedSeriesCount = 0;
+    var removedSeriesIds = [];
 
     if (existingIndex !== -1) {
       if (opts.applyToSeries && previousLesson && Calendar) {
@@ -604,6 +610,7 @@
           if (futureIds[item.id] && item.status === 'planned' && !item.isPaid) {
             if (!repeatWeekly) {
               updatedSeriesCount += 1;
+              removedSeriesIds.push(item.id);
               continue;
             }
             var shiftedDate =
@@ -612,6 +619,7 @@
                 : item.date;
             if (shiftedDate.slice(0, 7) !== targetMonthPrefix) {
               updatedSeriesCount += 1;
+              removedSeriesIds.push(item.id);
               continue;
             }
             var shiftedStatus =
@@ -631,6 +639,7 @@
                 teacherNoteActive: savedLesson.teacherNoteActive,
                 repeatWeekly: true,
                 seriesId: seriesId,
+                updatedAt: nowTs,
               })
             );
             updatedSeriesCount += 1;
@@ -644,6 +653,10 @@
       }
     } else {
       currentLessons.push(savedLesson);
+    }
+
+    if (removedSeriesIds.length > 0) {
+      currentDeletedIds = recordDeletedIds(currentDeletedIds, removedSeriesIds, nowTs);
     }
 
     var createdClones = [];
@@ -661,27 +674,31 @@
         },
         opts.now
       );
-      currentLessons = propResult.lessons;
+      currentLessons = propResult.lessons.map(function (l) {
+        return l.updatedAt ? l : Object.assign({}, l, { updatedAt: nowTs });
+      });
       createdClones = propResult.createdClones;
     }
 
-    savePlannerState(students, currentLessons);
+    savePlannerState(students, currentLessons, currentDeletedIds);
 
     return {
       lesson: savedLesson,
       lessons: currentLessons,
+      deletedIds: currentDeletedIds,
       createdClones: createdClones,
       updatedSeriesCount: updatedSeriesCount,
     };
   }
 
   /**
-   * Deletes a lesson. If applyToSeries === true, also deletes future planned unpaid
-   * lessons of the same series in that month (never touching completed or paid lessons).
+   * Deletes a lesson and records its id in deletedIds: [{ id, deletedAt }]
+   * so it will not resurrect when syncing with another device.
    */
   function deleteLessonWithAutoSync(students, lessons, lessonId, applyToSeries) {
     var Calendar = root.TutorPlanner && root.TutorPlanner.Calendar;
     var currentLessons = (lessons || []).slice();
+    var currentDeletedIds = loadDeletedIds();
     var target = null;
     for (var i = 0; i < currentLessons.length; i++) {
       if (currentLessons[i].id === lessonId) {
@@ -690,7 +707,11 @@
       }
     }
     if (!target) {
-      return { lessons: currentLessons, deletedCount: 0 };
+      return {
+        lessons: currentLessons,
+        deletedIds: currentDeletedIds,
+        deletedCount: 0,
+      };
     }
 
     var idsToDelete = {};
@@ -709,18 +730,53 @@
     }
 
     var deletedCount = 0;
+    var removedList = [];
     var remaining = currentLessons.filter(function (l) {
       if (idsToDelete[l.id]) {
         deletedCount += 1;
+        removedList.push(l.id);
         return false;
       }
       return true;
     });
 
-    savePlannerState(students, remaining);
+    var updatedDeletedIds = recordDeletedIds(
+      currentDeletedIds,
+      removedList,
+      Date.now()
+    );
+
+    savePlannerState(students, remaining, updatedDeletedIds);
     return {
       lessons: remaining,
+      deletedIds: updatedDeletedIds,
       deletedCount: deletedCount,
+    };
+  }
+
+  /**
+   * Deletes a student and all their lessons, recording all deleted IDs in deletedIds
+   * so neither the student nor their lessons resurrect during Smart Merge.
+   */
+  function deleteStudentWithAutoSync(students, lessons, studentId) {
+    var nowTs = Date.now();
+    var removedIds = [studentId];
+    var remainingStudents = (students || []).filter(function (s) {
+      return s.id !== studentId;
+    });
+    var remainingLessons = (lessons || []).filter(function (l) {
+      if (l.studentId === studentId) {
+        removedIds.push(l.id);
+        return false;
+      }
+      return true;
+    });
+    var updatedDeletedIds = recordDeletedIds(loadDeletedIds(), removedIds, nowTs);
+    savePlannerState(remainingStudents, remainingLessons, updatedDeletedIds);
+    return {
+      students: remainingStudents,
+      lessons: remainingLessons,
+      deletedIds: updatedDeletedIds,
     };
   }
 
@@ -755,6 +811,10 @@
     if (rolloverRes.triggered && rolloverRes.targetMonthKey) {
       setLastMonthRollover(rolloverRes.targetMonthKey);
       if (rolloverRes.createdLessons.length > 0) {
+        var nowTs = Date.now();
+        rolloverRes.lessons = rolloverRes.lessons.map(function (l) {
+          return l.updatedAt ? l : Object.assign({}, l, { updatedAt: nowTs });
+        });
         savePlannerState(students, rolloverRes.lessons);
       }
     }
@@ -767,15 +827,23 @@
     STUDENT_COLORS: STUDENT_COLORS,
     createId: createId,
     createInitialDemoData: createInitialDemoData,
+    normalizeDeletedIds: normalizeDeletedIds,
+    recordDeletedIds: recordDeletedIds,
+    loadDeletedIds: loadDeletedIds,
+    saveDeletedIds: saveDeletedIds,
     normalizeStateEntities: normalizeStateEntities,
     loadPlannerState: loadPlannerState,
     savePlannerState: savePlannerState,
     serializeDatabaseBackup: serializeDatabaseBackup,
     parseDatabaseBackupJSON: parseDatabaseBackupJSON,
+    mergeSyncData: mergeSyncData,
+    getPairedDeviceCode: getPairedDeviceCode,
+    setPairedDeviceCode: setPairedDeviceCode,
     getLastMonthRollover: getLastMonthRollover,
     setLastMonthRollover: setLastMonthRollover,
     saveLessonWithAutoSync: saveLessonWithAutoSync,
     deleteLessonWithAutoSync: deleteLessonWithAutoSync,
+    deleteStudentWithAutoSync: deleteStudentWithAutoSync,
     runAutoMonthRolloverIfNeeded: runAutoMonthRolloverIfNeeded,
   };
 

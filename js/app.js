@@ -13,6 +13,7 @@
     currentMondayISO: Calendar.getMondayOfWeek(todayISO),
     students: initialData.students,
     lessons: initialData.lessons,
+    deletedIds: initialData.deletedIds || [],
     subjectFilter: 'all',
     exactDateFilter: '',
     weekLayoutMode: 'board', // 'board' (2 columns) | 'rows' (vertical list of days)
@@ -22,7 +23,14 @@
     editingStudent: null,
     transferDirection: 'prev-to-current',
     pendingSeriesAction: null,
+    syncActiveTab: 'send',
+    syncHostCode: '',
   };
+
+  // Active P2P / WebRTC state
+  var activePeer = null;
+  var activeBroadcastChannel = null;
+  var peerJsLoadPromise = null;
 
   function enableScreenAutoRotation() {
     try {
@@ -46,7 +54,7 @@
         state.lessons = autoRes.lessons;
       }
     }
-    Store.savePlannerState(state.students, state.lessons);
+    Store.savePlannerState(state.students, state.lessons, state.deletedIds);
     UI.renderHeaderControls(state);
     UI.renderDashboard(state);
     UI.renderWeekGrid(state);
@@ -67,7 +75,469 @@
     }
     state._noticeTimer = setTimeout(function () {
       wrap.style.display = 'none';
-    }, 5000);
+    }, 6000);
+  }
+
+  function generateSixDigitCode() {
+    var paired = Store.getPairedDeviceCode();
+    if (paired && paired.length === 6) {
+      return paired;
+    }
+    var num = Math.floor(100000 + Math.random() * 900000);
+    return String(num);
+  }
+
+  function buildCurrentSyncPayloadObject() {
+    return {
+      version: 4,
+      exportedAt: new Date().toISOString(),
+      students: state.students,
+      lessons: state.lessons,
+      deletedIds: state.deletedIds || Store.loadDeletedIds(),
+    };
+  }
+
+  function applyIncomingSyncMerge(incomingData, codeUsed, shouldRemember) {
+    var mergeResult = Store.mergeSyncData(
+      {
+        students: state.students,
+        lessons: state.lessons,
+        deletedIds: state.deletedIds,
+      },
+      incomingData
+    );
+
+    state.students = mergeResult.students;
+    state.lessons = mergeResult.lessons;
+    state.deletedIds = mergeResult.deletedIds;
+
+    if (shouldRemember && codeUsed) {
+      Store.setPairedDeviceCode(codeUsed);
+    }
+
+    persistAndRender();
+    UI.renderSyncModalContent(state);
+
+    var successBox = document.getElementById('sync-success-report');
+    var successDetails = document.getElementById('sync-success-details');
+    if (successBox && successDetails) {
+      successDetails.textContent = mergeResult.reportText;
+      successBox.style.display = 'flex';
+    }
+
+    showNotice(
+      '✅ Устройства успешно синхронизированы! ' + mergeResult.reportText,
+      false
+    );
+
+    return mergeResult;
+  }
+
+  function setHostStatusText(text) {
+    var el = document.getElementById('sync-host-status-text');
+    if (el) el.textContent = text;
+  }
+
+  function setJoinStatusText(text, visible) {
+    var box = document.getElementById('sync-join-status');
+    var el = document.getElementById('sync-join-status-text');
+    if (box) box.style.display = visible === false ? 'none' : 'inline-flex';
+    if (el && text) el.textContent = text;
+  }
+
+  /**
+   * Dynamically loads lightweight PeerJS WebRTC client when online for cross-device 6-digit P2P sync,
+   * while falling back cleanly if offline or in restricted WebView.
+   */
+  function loadPeerJsClientIfAvailable() {
+    if (typeof window === 'undefined') return Promise.resolve(null);
+    if (window.Peer) return Promise.resolve(window.Peer);
+    if (peerJsLoadPromise) return peerJsLoadPromise;
+
+    peerJsLoadPromise = new Promise(function (resolve) {
+      var done = false;
+      var timer = setTimeout(function () {
+        if (!done) {
+          done = true;
+          resolve(window.Peer || null);
+        }
+      }, 3500);
+
+      try {
+        var script = document.createElement('script');
+        script.src = 'https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js';
+        script.async = true;
+        script.onload = function () {
+          if (!done) {
+            done = true;
+            clearTimeout(timer);
+            resolve(window.Peer || null);
+          }
+        };
+        script.onerror = function () {
+          if (!done) {
+            done = true;
+            clearTimeout(timer);
+            resolve(null);
+          }
+        };
+        document.head.appendChild(script);
+      } catch (e) {
+        if (!done) {
+          done = true;
+          clearTimeout(timer);
+          resolve(null);
+        }
+      }
+    });
+
+    return peerJsLoadPromise;
+  }
+
+  function cleanupActiveP2PSession() {
+    if (activeBroadcastChannel) {
+      try {
+        activeBroadcastChannel.close();
+      } catch (e) {
+        // Ignore close error
+      }
+      activeBroadcastChannel = null;
+    }
+    if (activePeer) {
+      try {
+        activePeer.destroy();
+      } catch (e) {
+        // Ignore destroy error
+      }
+      activePeer = null;
+    }
+  }
+
+  /**
+   * Starts listening as Host for the 6-digit code over both:
+   * 1) Local P2P BroadcastChannel / WebRTC DataChannel
+   * 2) Cross-device WebRTC PeerJS DataChannel ('tutor-planner-p2p-' + code6)
+   */
+  function startHostSyncListener(code6) {
+    var cleanCode = String(code6 || '').replace(/\D/g, '').slice(0, 6);
+    if (cleanCode.length !== 6) return;
+
+    cleanupActiveP2PSession();
+    setHostStatusText(
+      'Ожидание подключения второго устройства по коду ' +
+        UI.formatSixDigitCode(cleanCode) +
+        '...'
+    );
+
+    // 1. Local BroadcastChannel P2P listener (instant across local tabs/windows)
+    if (typeof window !== 'undefined' && typeof window.BroadcastChannel === 'function') {
+      try {
+        activeBroadcastChannel = new window.BroadcastChannel(
+          'tutor_planner_p2p_' + cleanCode
+        );
+        activeBroadcastChannel.onmessage = function (ev) {
+          var data = ev.data;
+          if (!data || data.type !== 'SYNC_REQUEST') return;
+          var rememberHostEl = document.getElementById('sync-remember-host-check');
+          var shouldRemember = rememberHostEl ? rememberHostEl.checked : true;
+          applyIncomingSyncMerge(data.payload, cleanCode, shouldRemember);
+          setHostStatusText('✅ Синхронизация успешно завершена!');
+          activeBroadcastChannel.postMessage({
+            type: 'SYNC_RESPONSE',
+            payload: buildCurrentSyncPayloadObject(),
+          });
+        };
+      } catch (e) {
+        // BroadcastChannel optional
+      }
+    }
+
+    // 2. WebRTC P2P listener for cross-device connection (phone <-> tablet <-> PC)
+    loadPeerJsClientIfAvailable().then(function (PeerConstructor) {
+      if (!PeerConstructor || state.syncHostCode !== cleanCode) return;
+      try {
+        var peerId = 'tutor-planner-p2p-' + cleanCode;
+        var peer = new PeerConstructor(peerId, {
+          config: {
+            iceServers: [
+              { urls: 'stun:stun.l.google.com:19302' },
+              { urls: 'stun:global.stun.twilio.com:3478' },
+            ],
+          },
+        });
+        activePeer = peer;
+
+        peer.on('open', function () {
+          setHostStatusText(
+            'Готово к связыванию по коду ' +
+              UI.formatSixDigitCode(cleanCode) +
+              '. Введите этот код на втором устройстве.'
+          );
+        });
+
+        peer.on('connection', function (conn) {
+          setHostStatusText('Устройство подключено, выполняем умное слияние...');
+          conn.on('data', function (msg) {
+            if (msg && msg.type === 'SYNC_REQUEST' && msg.payload) {
+              var rememberHostEl = document.getElementById('sync-remember-host-check');
+              var shouldRemember = rememberHostEl ? rememberHostEl.checked : true;
+              applyIncomingSyncMerge(msg.payload, cleanCode, shouldRemember);
+              conn.send({
+                type: 'SYNC_RESPONSE',
+                payload: buildCurrentSyncPayloadObject(),
+              });
+              setHostStatusText('✅ Устройства успешно синхронизированы!');
+            }
+          });
+        });
+
+        peer.on('error', function () {
+          setHostStatusText(
+            'Код ' +
+              UI.formatSixDigitCode(cleanCode) +
+              ' активен (при работе без интернета используйте кнопку Bluetooth / Quick Share ниже).'
+          );
+        });
+      } catch (e) {
+        // Fallback if WebRTC blocked
+      }
+    });
+  }
+
+  /**
+   * Connects to another device by its 6-digit code, exchanges databases in both directions,
+   * and executes Smart Merge on both screens.
+   */
+  function connectAndSyncBySixDigitCode(rawCode, shouldRemember) {
+    var cleanCode = String(rawCode || '').replace(/\D/g, '').slice(0, 6);
+    if (cleanCode.length !== 6) {
+      showNotice('Введите 6 цифр кода со второго устройства.', true);
+      return;
+    }
+
+    setJoinStatusText(
+      'Поиск устройства по коду ' + UI.formatSixDigitCode(cleanCode) + '...',
+      true
+    );
+
+    var resolved = false;
+    var localPayload = buildCurrentSyncPayloadObject();
+
+    // 1. Try instant local BroadcastChannel / storage bridge first
+    if (typeof window !== 'undefined' && typeof window.BroadcastChannel === 'function') {
+      try {
+        var joinChannel = new window.BroadcastChannel(
+          'tutor_planner_p2p_' + cleanCode
+        );
+        joinChannel.onmessage = function (ev) {
+          var data = ev.data;
+          if (!data || data.type !== 'SYNC_RESPONSE' || resolved) return;
+          resolved = true;
+          applyIncomingSyncMerge(data.payload, cleanCode, shouldRemember);
+          setJoinStatusText('✅ Устройства успешно синхронизированы!', true);
+          try {
+            joinChannel.close();
+          } catch (e) {
+            // Ignore
+          }
+        };
+        joinChannel.postMessage({
+          type: 'SYNC_REQUEST',
+          payload: localPayload,
+        });
+      } catch (e) {
+        // Ignore BroadcastChannel error
+      }
+    }
+
+    // 2. Connect over WebRTC P2P DataChannel to 'tutor-planner-p2p-' + cleanCode
+    loadPeerJsClientIfAvailable().then(function (PeerConstructor) {
+      if (resolved) return;
+      if (!PeerConstructor) {
+        setTimeout(function () {
+          if (!resolved) {
+            setJoinStatusText(
+              'Прямое соединение недоступно без сети. Нажмите «📲 Передать через Bluetooth / Quick Share» ниже.',
+              true
+            );
+          }
+        }, 1200);
+        return;
+      }
+
+      try {
+        var clientPeer = new PeerConstructor({
+          config: {
+            iceServers: [
+              { urls: 'stun:stun.l.google.com:19302' },
+              { urls: 'stun:global.stun.twilio.com:3478' },
+            ],
+          },
+        });
+
+        var timeoutId = setTimeout(function () {
+          if (!resolved) {
+            setJoinStatusText(
+              'Второе устройство не найдено по коду ' +
+                UI.formatSixDigitCode(cleanCode) +
+                '. Проверьте, открыто ли окно с этим кодом на втором устройстве.',
+              true
+            );
+            try {
+              clientPeer.destroy();
+            } catch (e) {
+              // Ignore
+            }
+          }
+        }, 8000);
+
+        clientPeer.on('open', function () {
+          var conn = clientPeer.connect('tutor-planner-p2p-' + cleanCode, {
+            reliable: true,
+          });
+
+          conn.on('open', function () {
+            setJoinStatusText('Соединение установлено, объединяем расписание...', true);
+            conn.send({
+              type: 'SYNC_REQUEST',
+              payload: localPayload,
+            });
+          });
+
+          conn.on('data', function (msg) {
+            if (msg && msg.type === 'SYNC_RESPONSE' && msg.payload && !resolved) {
+              resolved = true;
+              clearTimeout(timeoutId);
+              applyIncomingSyncMerge(msg.payload, cleanCode, shouldRemember);
+              setJoinStatusText('✅ Устройства успешно синхронизированы!', true);
+              setTimeout(function () {
+                try {
+                  clientPeer.destroy();
+                } catch (e) {
+                  // Ignore
+                }
+              }, 1000);
+            }
+          });
+
+          conn.on('error', function () {
+            if (!resolved) {
+              clearTimeout(timeoutId);
+              setJoinStatusText(
+                'Не удалось связаться по коду. Используйте кнопку Bluetooth / Quick Share ниже.',
+                true
+              );
+            }
+          });
+        });
+
+        clientPeer.on('error', function () {
+          if (!resolved) {
+            clearTimeout(timeoutId);
+            setJoinStatusText(
+              'Второе устройство с кодом ' +
+                UI.formatSixDigitCode(cleanCode) +
+                ' сейчас не в сети. Проверьте код или передайте через Bluetooth / Quick Share.',
+              true
+            );
+          }
+        });
+      } catch (e) {
+        if (!resolved) {
+          setJoinStatusText(
+            'Для передачи без интернета нажмите «📲 Передать через Bluetooth / Quick Share».',
+            true
+          );
+        }
+      }
+    });
+  }
+
+  /**
+   * Method 2: Offline 1-tap share via Android native Share Sheet (Bluetooth / Quick Share / Messengers)
+   * using Web Share API Level 2 (navigator.share with File), with automatic file download fallback.
+   */
+  function handleAndroidNativeShare() {
+    var json = Store.serializeDatabaseBackup(
+      state.students,
+      state.lessons,
+      state.deletedIds
+    );
+    var fileName = 'raspisanie-sinhronizaciya-' + state.todayISO + '.json';
+
+    try {
+      if (
+        typeof navigator !== 'undefined' &&
+        typeof navigator.share === 'function' &&
+        typeof File === 'function'
+      ) {
+        var syncFile = new File([json], fileName, {
+          type: 'application/json',
+        });
+        var shareData = {
+          title: 'Планер репетитора — Синхронизация расписания',
+          text: 'Откройте этот файл во втором устройстве через кнопку «Принять файл синхронизации»',
+          files: [syncFile],
+        };
+
+        if (!navigator.canShare || navigator.canShare({ files: [syncFile] })) {
+          navigator
+            .share(shareData)
+            .then(function () {
+              showNotice(
+                'Файл синхронизации отправлен! На втором устройстве нажмите «Принять файл синхронизации».',
+                false
+              );
+            })
+            .catch(function (err) {
+              if (err && err.name === 'AbortError') return;
+              triggerFallbackDownload(json, fileName);
+            });
+          return;
+        }
+      }
+    } catch (e) {
+      // Fallback to direct file download
+    }
+
+    triggerFallbackDownload(json, fileName);
+  }
+
+  function triggerFallbackDownload(jsonContent, fileName) {
+    var blob = new Blob([jsonContent], { type: 'application/json;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = fileName || 'raspisanie-sinhronizaciya-' + state.todayISO + '.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showNotice(
+      'Файл синхронизации сохранен. Передайте его на второе устройство через Bluetooth или Quick Share.',
+      false
+    );
+  }
+
+  function openSyncModal(initialTab) {
+    var modal = document.getElementById('sync-modal');
+    if (!modal) return;
+
+    state.syncActiveTab = initialTab || 'send';
+    if (!state.syncHostCode) {
+      state.syncHostCode = generateSixDigitCode();
+    }
+
+    var successBox = document.getElementById('sync-success-report');
+    if (successBox) successBox.style.display = 'none';
+    setJoinStatusText('', false);
+
+    UI.renderSyncModalContent(state);
+    modal.classList.remove('hidden');
+
+    if (state.syncActiveTab === 'send') {
+      startHostSyncListener(state.syncHostCode);
+    }
   }
 
   /**
@@ -126,6 +596,13 @@
     var noteEl = document.getElementById('lesson-student-note');
     if (!selectEl) return;
 
+    if (state.students.length === 0) {
+      selectEl.innerHTML =
+        '<option value="">— Сначала создайте ученика ниже —</option>';
+      if (noteEl) noteEl.textContent = '';
+      return;
+    }
+
     var html = '';
     for (var i = 0; i < state.students.length; i++) {
       var s = state.students[i];
@@ -133,7 +610,7 @@
       var sPrice =
         typeof s.defaultPrice === 'number' && !isNaN(s.defaultPrice)
           ? s.defaultPrice
-          : 1500;
+          : 0;
       html +=
         '<option value="' +
         UI.escapeHtml(s.id) +
@@ -143,8 +620,7 @@
         UI.escapeHtml(s.name) +
         ' (' +
         (s.defaultSubject === 'rus' ? 'Русский' : 'Английский') +
-        ' · ' +
-        Calendar.formatCurrency(sPrice) +
+        (sPrice > 0 ? ' · ' + Calendar.formatCurrency(sPrice) : '') +
         ')</option>';
     }
     selectEl.innerHTML = html;
@@ -233,7 +709,9 @@
     var deleteBtn = document.getElementById('delete-lesson-btn');
     var quickBox = document.getElementById('quick-student-box');
 
-    if (quickBox) quickBox.style.display = 'none';
+    if (quickBox) {
+      quickBox.style.display = state.students.length === 0 ? 'flex' : 'none';
+    }
 
     var quickPresetsEl = document.getElementById('quick-stu-color-presets');
     var quickColorInput = document.getElementById('quick-stu-color');
@@ -257,7 +735,6 @@
 
     var dateVal = isEdit ? lessonOrNull.date : defaultDateISO || state.todayISO;
     var startVal = isEdit ? lessonOrNull.startTime : '15:00';
-    // Default duration is 1 hour (60 minutes)
     var endVal = isEdit
       ? lessonOrNull.endTime
       : Calendar.addMinutesToTime(startVal, 60);
@@ -269,10 +746,12 @@
     var statusVal = isEdit ? lessonOrNull.status : 'planned';
     var priceVal =
       isEdit && typeof lessonOrNull.price === 'number' && !isNaN(lessonOrNull.price)
-        ? lessonOrNull.price
-        : selectedStu && typeof selectedStu.defaultPrice === 'number'
-        ? selectedStu.defaultPrice
-        : 1500;
+        ? String(lessonOrNull.price)
+        : selectedStu &&
+          typeof selectedStu.defaultPrice === 'number' &&
+          selectedStu.defaultPrice > 0
+        ? String(selectedStu.defaultPrice)
+        : '';
     var cwVal = isEdit ? lessonOrNull.classwork : '';
     var hwVal = isEdit ? lessonOrNull.homework : '';
     var hwCheckedVal = isEdit ? Boolean(lessonOrNull.hwChecked) : false;
@@ -300,7 +779,7 @@
     document.getElementById('lesson-subject').value = subjVal;
     document.getElementById('lesson-status').value = statusVal;
     var priceInput = document.getElementById('lesson-price');
-    if (priceInput) priceInput.value = String(priceVal);
+    if (priceInput) priceInput.value = priceVal;
     document.getElementById('lesson-classwork').value = cwVal;
     document.getElementById('lesson-homework').value = hwVal;
     document.getElementById('lesson-hw-checked').checked = hwCheckedVal;
@@ -329,7 +808,8 @@
 
   function closeAllModals() {
     hideSeriesConfirmBox();
-    var ids = ['lesson-modal', 'students-modal', 'autotransfer-modal'];
+    cleanupActiveP2PSession();
+    var ids = ['lesson-modal', 'students-modal', 'autotransfer-modal', 'sync-modal'];
     for (var i = 0; i < ids.length; i++) {
       var el = document.getElementById(ids[i]);
       if (el) el.classList.add('hidden');
@@ -342,6 +822,7 @@
     noteText,
     isActive
   ) {
+    var nowTs = Date.now();
     var cleanText = (noteText || '').trim();
     var finalActive = Boolean(isActive && cleanText);
 
@@ -350,6 +831,7 @@
       return Object.assign({}, s, {
         teacherNote: finalActive ? cleanText : '',
         teacherNoteActive: finalActive,
+        updatedAt: nowTs,
       });
     });
 
@@ -359,6 +841,7 @@
         return Object.assign({}, l, {
           teacherNote: finalActive ? cleanText : '',
           teacherNoteActive: finalActive,
+          updatedAt: nowTs,
         });
       }
       return l;
@@ -467,7 +950,7 @@
       openLessonModal(null, state.exactDateFilter || state.todayISO);
     });
 
-    // Open Students Modal (Desktop & Mobile) — remove hidden class immediately for instant UI response
+    // Open Students Modal (Desktop & Mobile)
     function handleOpenStudents() {
       state.historyStudentId = null;
       state.isStudentFormOpen = false;
@@ -480,6 +963,137 @@
     document
       .getElementById('open-students-btn-mobile')
       .addEventListener('click', handleOpenStudents);
+
+    // Open Sync Modal (Desktop & Mobile)
+    var openSyncBtn = document.getElementById('open-sync-modal-btn');
+    var openSyncMobileBtn = document.getElementById('open-sync-modal-btn-mobile');
+    if (openSyncBtn) {
+      openSyncBtn.addEventListener('click', function () {
+        openSyncModal('send');
+      });
+    }
+    if (openSyncMobileBtn) {
+      openSyncMobileBtn.addEventListener('click', function () {
+        openSyncModal('send');
+      });
+    }
+
+    // 1-Click Quick Sync with Remembered Device
+    var quickHeaderSyncBtn = document.getElementById('quick-oneclick-sync-header-btn');
+    if (quickHeaderSyncBtn) {
+      quickHeaderSyncBtn.addEventListener('click', function () {
+        var paired = Store.getPairedDeviceCode();
+        if (paired) {
+          openSyncModal('receive');
+          var inp = document.getElementById('sync-input-code');
+          if (inp) inp.value = UI.formatSixDigitCode(paired);
+          connectAndSyncBySixDigitCode(paired, true);
+        } else {
+          openSyncModal('send');
+        }
+      });
+    }
+
+    // Sync Modal Internal Controls
+    var tabSendBtn = document.getElementById('sync-tab-btn-send');
+    var tabReceiveBtn = document.getElementById('sync-tab-btn-receive');
+    if (tabSendBtn) {
+      tabSendBtn.addEventListener('click', function () {
+        state.syncActiveTab = 'send';
+        if (!state.syncHostCode) {
+          state.syncHostCode = generateSixDigitCode();
+        }
+        UI.renderSyncModalContent(state);
+        startHostSyncListener(state.syncHostCode);
+      });
+    }
+    if (tabReceiveBtn) {
+      tabReceiveBtn.addEventListener('click', function () {
+        state.syncActiveTab = 'receive';
+        UI.renderSyncModalContent(state);
+        var inp = document.getElementById('sync-input-code');
+        if (inp) inp.focus();
+      });
+    }
+
+    var copyCodeBtn = document.getElementById('sync-copy-code-btn');
+    if (copyCodeBtn) {
+      copyCodeBtn.addEventListener('click', function () {
+        var formatted = UI.formatSixDigitCode(state.syncHostCode);
+        if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+          navigator.clipboard.writeText(formatted).then(function () {
+            showNotice('Код ' + formatted + ' скопирован.', false);
+          });
+        } else {
+          showNotice('Ваш код синхронизации: ' + formatted, false);
+        }
+      });
+    }
+
+    var regenCodeBtn = document.getElementById('sync-regenerate-code-btn');
+    if (regenCodeBtn) {
+      regenCodeBtn.addEventListener('click', function () {
+        var random6 = String(Math.floor(100000 + Math.random() * 900000));
+        state.syncHostCode = random6;
+        UI.renderSyncModalContent(state);
+        startHostSyncListener(random6);
+      });
+    }
+
+    var syncCodeInput = document.getElementById('sync-input-code');
+    if (syncCodeInput) {
+      syncCodeInput.addEventListener('input', function (e) {
+        var digits = String(e.target.value || '').replace(/\D/g, '').slice(0, 6);
+        e.target.value = UI.formatSixDigitCode(digits);
+      });
+    }
+
+    var syncConnectBtn = document.getElementById('sync-connect-code-btn');
+    if (syncConnectBtn) {
+      syncConnectBtn.addEventListener('click', function () {
+        var inp = document.getElementById('sync-input-code');
+        var remCheck = document.getElementById('sync-remember-device-check');
+        var rawVal = inp ? inp.value : '';
+        var remember = remCheck ? remCheck.checked : true;
+        connectAndSyncBySixDigitCode(rawVal, remember);
+      });
+    }
+
+    var syncOneClickNowBtn = document.getElementById('sync-oneclick-now-btn');
+    if (syncOneClickNowBtn) {
+      syncOneClickNowBtn.addEventListener('click', function () {
+        var paired = Store.getPairedDeviceCode();
+        if (!paired) return;
+        state.syncActiveTab = 'receive';
+        UI.renderSyncModalContent(state);
+        var inp = document.getElementById('sync-input-code');
+        if (inp) inp.value = UI.formatSixDigitCode(paired);
+        connectAndSyncBySixDigitCode(paired, true);
+      });
+    }
+
+    var syncForgetBtn = document.getElementById('sync-forget-device-btn');
+    if (syncForgetBtn) {
+      syncForgetBtn.addEventListener('click', function () {
+        Store.setPairedDeviceCode('');
+        UI.renderHeaderControls(state);
+        UI.renderSyncModalContent(state);
+        showNotice('Связанное устройство удалено из памяти.', false);
+      });
+    }
+
+    var androidShareBtn = document.getElementById('sync-android-share-btn');
+    if (androidShareBtn) {
+      androidShareBtn.addEventListener('click', handleAndroidNativeShare);
+    }
+
+    var acceptFileBtn = document.getElementById('sync-accept-file-btn');
+    var importInput = document.getElementById('import-json-input');
+    if (acceptFileBtn && importInput) {
+      acceptFileBtn.addEventListener('click', function () {
+        importInput.click();
+      });
+    }
 
     // Header search & settings drawer toggles + brand sub-links + bottom tab bar
     var settingsDrawer = document.getElementById('toolbar-settings-drawer');
@@ -537,8 +1151,13 @@
         handleOpenStudents();
         return;
       }
+      if (targetKey === 'sync') {
+        setActiveBottomTab('sync');
+        openSyncModal('send');
+        return;
+      }
       if (targetKey === 'stats') {
-        setActiveBottomTab('stats');
+        setActiveBottomTab('planner');
         var statsSec = document.getElementById('stats-dashboard-section');
         if (statsSec && typeof statsSec.scrollIntoView === 'function') {
           statsSec.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -577,72 +1196,55 @@
       });
     }
 
-    // Open AutoTransfer Modal if legacy trigger exists
-    var openAutoBtn = document.getElementById('open-autotransfer-btn');
-    var openAutoMobileBtn = document.getElementById('open-autotransfer-btn-mobile');
-    function handleOpenAutoTransfer() {
-      state.transferDirection = 'prev-to-current';
-      UI.renderAutoTransferModalContent(state);
-      document.getElementById('autotransfer-modal').classList.remove('hidden');
-    }
-    if (openAutoBtn) {
-      openAutoBtn.addEventListener('click', handleOpenAutoTransfer);
-    }
-    if (openAutoMobileBtn) {
-      openAutoMobileBtn.addEventListener('click', handleOpenAutoTransfer);
+    // Save local backup file (from Sync modal footer)
+    var exportBtn = document.getElementById('export-json-btn');
+    if (exportBtn) {
+      exportBtn.addEventListener('click', function () {
+        var json = Store.serializeDatabaseBackup(
+          state.students,
+          state.lessons,
+          state.deletedIds
+        );
+        triggerFallbackDownload(
+          json,
+          'raspisanie-rezervnaya-kopiya-' + state.todayISO + '.json'
+        );
+      });
     }
 
-    // Export JSON (Desktop & Mobile)
-    function handleExportJSON() {
-      var json = Store.serializeDatabaseBackup(state.students, state.lessons);
-      var blob = new Blob([json], { type: 'application/json;charset=utf-8' });
-      var url = URL.createObjectURL(blob);
-      var a = document.createElement('a');
-      a.href = url;
-      a.download = 'tutor-planner-backup-' + state.todayISO + '.json';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      showNotice('Резервная копия базы (JSON) сохранена.', false);
+    // Accept & Smart-Merge Sync File (Desktop, Mobile, and Sync Modal)
+    var importBtn = document.getElementById('import-json-btn');
+    var importMobileBtn = document.getElementById('import-json-btn-mobile');
+    if (importBtn && importInput) {
+      importBtn.addEventListener('click', function () {
+        importInput.click();
+      });
     }
-    document.getElementById('export-json-btn').addEventListener('click', handleExportJSON);
-    document.getElementById('export-json-btn-mobile').addEventListener('click', handleExportJSON);
-
-    // Import JSON (Desktop & Mobile)
-    var importInput = document.getElementById('import-json-input');
-    document.getElementById('import-json-btn').addEventListener('click', function () {
-      importInput.click();
-    });
-    document.getElementById('import-json-btn-mobile').addEventListener('click', function () {
-      importInput.click();
-    });
-    importInput.addEventListener('change', function (e) {
-      var file = e.target.files && e.target.files[0];
-      if (!file) return;
-      var reader = new FileReader();
-      reader.onload = function (ev) {
-        try {
-          var content = String((ev.target && ev.target.result) || '');
-          var parsed = Store.parseDatabaseBackupJSON(content);
-          state.students = parsed.students;
-          state.lessons = parsed.lessons;
-          persistAndRender();
-          showNotice(
-            'База успешно импортирована: учеников — ' +
-              parsed.students.length +
-              ', уроков — ' +
-              parsed.lessons.length +
-              '.',
-            false
-          );
-        } catch (err) {
-          showNotice(err.message || 'Ошибка чтения JSON файла.', true);
-        }
-      };
-      reader.readAsText(file);
-      e.target.value = '';
-    });
+    if (importMobileBtn && importInput) {
+      importMobileBtn.addEventListener('click', function () {
+        importInput.click();
+      });
+    }
+    if (importInput) {
+      importInput.addEventListener('change', function (e) {
+        var file = e.target.files && e.target.files[0];
+        if (!file) return;
+        var reader = new FileReader();
+        reader.onload = function (ev) {
+          try {
+            var content = String((ev.target && ev.target.result) || '');
+            applyIncomingSyncMerge(content, '', false);
+          } catch (err) {
+            showNotice(
+              err.message || 'Не удалось прочитать файл синхронизации.',
+              true
+            );
+          }
+        };
+        reader.readAsText(file);
+        e.target.value = '';
+      });
+    }
 
     // Notice close
     document.getElementById('notice-close-btn').addEventListener('click', function () {
@@ -661,9 +1263,10 @@
       if (paidBtn) {
         e.stopPropagation();
         var lesId = paidBtn.getAttribute('data-lesson-id');
+        var nowTs = Date.now();
         state.lessons = state.lessons.map(function (l) {
           return l.id === lesId
-            ? Object.assign({}, l, { isPaid: !l.isPaid })
+            ? Object.assign({}, l, { isPaid: !l.isPaid, updatedAt: nowTs })
             : l;
         });
         persistAndRender();
@@ -680,7 +1283,7 @@
       }
     });
 
-    // Lesson Modal Controls: Student change, 1-hour duration & startTime auto-calculation
+    // Lesson Modal Controls
     document.getElementById('lesson-student').addEventListener('change', function (e) {
       var selectedId = e.target.value;
       var stu = state.students.find(function (s) {
@@ -690,9 +1293,10 @@
         document.getElementById('lesson-subject').value = stu.defaultSubject;
         var priceEl = document.getElementById('lesson-price');
         if (priceEl) {
-          priceEl.value = String(
-            typeof stu.defaultPrice === 'number' ? stu.defaultPrice : 1500
-          );
+          priceEl.value =
+            typeof stu.defaultPrice === 'number' && stu.defaultPrice > 0
+              ? String(stu.defaultPrice)
+              : '';
         }
         var noteEl = document.getElementById('lesson-student-note');
         if (noteEl) noteEl.textContent = stu.notes ? 'Профиль ученика: ' + stu.notes : '';
@@ -813,8 +1417,9 @@
         return;
       }
 
-      var rawPrice = priceInput ? Number(priceInput.value) : 1500;
-      var defaultPrice = !isNaN(rawPrice) && rawPrice >= 0 ? rawPrice : 1500;
+      var rawPrice =
+        priceInput && priceInput.value !== '' ? Number(priceInput.value) : 0;
+      var defaultPrice = !isNaN(rawPrice) && rawPrice >= 0 ? rawPrice : 0;
       var colorVal =
         colorInput && colorInput.value ? colorInput.value : '#3b82f6';
 
@@ -827,14 +1432,18 @@
         notes: (notesInput.value || '').trim(),
         teacherNote: '',
         teacherNoteActive: false,
+        updatedAt: Date.now(),
       };
       state.students.push(newStu);
       populateLessonStudentSelect(newStu.id);
       document.getElementById('lesson-subject').value = newStu.defaultSubject;
       var lessonPriceEl = document.getElementById('lesson-price');
-      if (lessonPriceEl) lessonPriceEl.value = String(newStu.defaultPrice);
+      if (lessonPriceEl) {
+        lessonPriceEl.value = newStu.defaultPrice > 0 ? String(newStu.defaultPrice) : '';
+      }
 
       nameInput.value = '';
+      if (priceInput) priceInput.value = '';
       notesInput.value = '';
       document.getElementById('quick-student-box').style.display = 'none';
       var currentDateVal = document.getElementById('lesson-date').value;
@@ -864,9 +1473,10 @@
         { applyToSeries: Boolean(applyToSeries) }
       );
       state.lessons = syncRes.lessons;
+      if (syncRes.deletedIds) {
+        state.deletedIds = syncRes.deletedIds;
+      }
 
-      // If today is the last day of the month or the saved lesson is on the last day of the month,
-      // also synchronize next month's schedule immediately.
       if (
         Calendar.isLastDayOfMonth(state.todayISO) ||
         Calendar.isLastDayOfMonth(payload.date)
@@ -930,6 +1540,9 @@
         Boolean(applyToSeries)
       );
       state.lessons = delRes.lessons;
+      if (delRes.deletedIds) {
+        state.deletedIds = delRes.deletedIds;
+      }
       closeAllModals();
       persistAndRender();
       if (applyToSeries && delRes.deletedCount > 1) {
@@ -1013,8 +1626,9 @@
       var subject = document.getElementById('lesson-subject').value;
       var status = document.getElementById('lesson-status').value;
       var priceEl = document.getElementById('lesson-price');
-      var rawPrice = priceEl ? Number(priceEl.value) : 1500;
-      var price = !isNaN(rawPrice) && rawPrice >= 0 ? rawPrice : 1500;
+      var rawPrice =
+        priceEl && priceEl.value !== '' ? Number(priceEl.value) : 0;
+      var price = !isNaN(rawPrice) && rawPrice >= 0 ? rawPrice : 0;
       var classwork = document.getElementById('lesson-classwork').value.trim();
       var homework = document.getElementById('lesson-homework').value.trim();
       var hwChecked = document.getElementById('lesson-hw-checked').checked;
@@ -1027,7 +1641,11 @@
       var repeatCheckEl = document.getElementById('lesson-repeat-weekly');
       var repeatWeekly = repeatCheckEl ? repeatCheckEl.checked : true;
 
-      if (!studentId || !date) return;
+      if (!studentId) {
+        showNotice('Пожалуйста, сначала создайте или выберите ученика.', true);
+        return;
+      }
+      if (!date) return;
 
       var existingLesson = state.editingLessonId
         ? state.lessons.find(function (l) {
@@ -1054,6 +1672,7 @@
         _rawTeacherNoteText: teacherNoteText,
         repeatWeekly: repeatWeekly,
         seriesId: existingLesson ? existingLesson.seriesId || '' : '',
+        updatedAt: Date.now(),
       };
 
       if (existingLesson && existingLesson.status === 'planned') {
@@ -1119,6 +1738,19 @@
         return;
       }
 
+      if (e.target.closest('[data-action="empty-open-add-student"]')) {
+        state.editingStudent = null;
+        state.isStudentFormOpen = true;
+        UI.renderStudentsModalContent(state);
+        return;
+      }
+
+      if (e.target.closest('[data-action="empty-open-sync"]')) {
+        closeAllModals();
+        openSyncModal('send');
+        return;
+      }
+
       var closeFormBtn = e.target.closest('[data-action="close-student-form"]');
       if (closeFormBtn) {
         state.isStudentFormOpen = false;
@@ -1149,12 +1781,14 @@
       var delStuBtn = e.target.closest('[data-action="delete-student"]');
       if (delStuBtn) {
         var delId = delStuBtn.getAttribute('data-student-id');
-        state.students = state.students.filter(function (s) {
-          return s.id !== delId;
-        });
-        state.lessons = state.lessons.filter(function (l) {
-          return l.studentId !== delId;
-        });
+        var delStuRes = Store.deleteStudentWithAutoSync(
+          state.students,
+          state.lessons,
+          delId
+        );
+        state.students = delStuRes.students;
+        state.lessons = delStuRes.lessons;
+        state.deletedIds = delStuRes.deletedIds;
         persistAndRender();
         UI.renderStudentsModalContent(state);
         showNotice('Ученик и связанные уроки удалены.', false);
@@ -1186,9 +1820,11 @@
         var notesVal = document.getElementById('stu-form-notes').value.trim();
         if (!nameVal) return;
 
-        var rawPrice = priceEl ? Number(priceEl.value) : 1500;
-        var defaultPrice = !isNaN(rawPrice) && rawPrice >= 0 ? rawPrice : 1500;
+        var rawPrice =
+          priceEl && priceEl.value !== '' ? Number(priceEl.value) : 0;
+        var defaultPrice = !isNaN(rawPrice) && rawPrice >= 0 ? rawPrice : 0;
         var colorVal = colorEl && colorEl.value ? colorEl.value : '#3b82f6';
+        var nowTs = Date.now();
 
         if (state.editingStudent) {
           var editId = state.editingStudent.id;
@@ -1201,10 +1837,10 @@
                   defaultPrice: defaultPrice,
                   color: colorVal,
                   notes: notesVal,
+                  updatedAt: nowTs,
                 })
               : s;
           });
-          // Update future planned unpaid lessons of this student if they used the old default price
           state.lessons = state.lessons.map(function (l) {
             if (
               l.studentId === editId &&
@@ -1212,7 +1848,10 @@
               !l.isPaid &&
               l.price === oldPrice
             ) {
-              return Object.assign({}, l, { price: defaultPrice });
+              return Object.assign({}, l, {
+                price: defaultPrice,
+                updatedAt: nowTs,
+              });
             }
             return l;
           });
@@ -1227,6 +1866,7 @@
             notes: notesVal,
             teacherNote: '',
             teacherNoteActive: false,
+            updatedAt: nowTs,
           });
           showNotice('Ученик добавлен в справочник.', false);
         }
@@ -1264,7 +1904,11 @@
         targetMonday
       );
       if (res.createdLessons.length > 0) {
-        state.lessons = state.lessons.concat(res.createdLessons);
+        var nowTs = Date.now();
+        var stamped = res.createdLessons.map(function (l) {
+          return Object.assign({}, l, { updatedAt: nowTs });
+        });
+        state.lessons = state.lessons.concat(stamped);
         state.currentMondayISO = targetMonday;
         state.exactDateFilter = '';
         persistAndRender();

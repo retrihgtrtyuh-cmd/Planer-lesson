@@ -33,6 +33,12 @@
     return count + ' уроков';
   }
 
+  function formatSixDigitCode(code) {
+    var digits = String(code || '').replace(/\D/g, '').slice(0, 6);
+    if (digits.length <= 3) return digits;
+    return digits.slice(0, 3) + '-' + digits.slice(3, 6);
+  }
+
   var ICONS = {
     clock:
       '<svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14" stroke-linecap="round" stroke-linejoin="round"/></svg>',
@@ -166,6 +172,7 @@
 
   function renderHeaderControls(state) {
     var Calendar = root.TutorPlanner.Calendar;
+    var Store = root.TutorPlanner.Store;
     var rangeLabel = document.getElementById('week-range-label');
     if (rangeLabel) {
       rangeLabel.textContent = Calendar.formatWeekRange(state.currentMondayISO);
@@ -175,6 +182,23 @@
     var countMobileSpan = document.getElementById('students-count-badge-mobile');
     if (countSpan) countSpan.textContent = String(state.students.length);
     if (countMobileSpan) countMobileSpan.textContent = String(state.students.length);
+
+    var pairedCode =
+      Store && typeof Store.getPairedDeviceCode === 'function'
+        ? Store.getPairedDeviceCode()
+        : '';
+    var quickHeaderSyncBtn = document.getElementById('quick-oneclick-sync-header-btn');
+    if (quickHeaderSyncBtn) {
+      if (pairedCode) {
+        quickHeaderSyncBtn.style.display = 'inline-flex';
+        quickHeaderSyncBtn.title =
+          'Обновить расписание со связанным устройством (код ' +
+          formatSixDigitCode(pairedCode) +
+          ') в 1 нажатие';
+      } else {
+        quickHeaderSyncBtn.style.display = 'none';
+      }
+    }
 
     var btnAll = document.getElementById('filter-subj-all');
     var btnEng = document.getElementById('filter-subj-eng');
@@ -213,8 +237,8 @@
       clearDateBtn.style.display = state.exactDateFilter ? 'inline-flex' : 'none';
     }
 
-    var Store = root.TutorPlanner.Store;
-    var rolloverKey = Store && Store.getLastMonthRollover ? Store.getLastMonthRollover() : '';
+    var rolloverKey =
+      Store && Store.getLastMonthRollover ? Store.getLastMonthRollover() : '';
     var autoSyncTextEl = document.getElementById('autosync-status-text');
     var autoSyncMobileEl = document.getElementById('autosync-status-text-mobile');
     var statusLabel = 'Автозаполнение до конца месяца';
@@ -237,7 +261,6 @@
     var weekDays = Calendar.getWeekDays(state.currentMondayISO, state.todayISO);
     var html = '';
 
-    // Highlight selected day, or if no exactDateFilter is active, highlight today (or Monday if today is not in this week)
     var hasTodayInWeek = weekDays.some(function (d) {
       return d.isToday;
     });
@@ -370,7 +393,7 @@
               ? lesson.price
               : student && typeof student.defaultPrice === 'number'
               ? student.defaultPrice
-              : 1500;
+              : 0;
 
           var isCancelled = lesson.status === 'cancelled';
           var isPastOrDone =
@@ -479,8 +502,7 @@
               '</span>' +
               '</button>';
           } else {
-            html +=
-              '<span class="cancelled-badge">Отменен</span>';
+            html += '<span class="cancelled-badge">Отменен</span>';
           }
 
           html += '</div></div></div>';
@@ -567,7 +589,7 @@
             ? 'Английский (ENG)'
             : 'Русский (RUS)') +
           ' · Стоимость: ' +
-          Calendar.formatCurrency(historyStudent.defaultPrice || 1500);
+          Calendar.formatCurrency(historyStudent.defaultPrice || 0);
       }
       if (backBtn) backBtn.style.display = 'inline-flex';
       if (openAddBtn) openAddBtn.style.display = 'none';
@@ -637,7 +659,7 @@
           var lesPrice =
             typeof les.price === 'number' && !isNaN(les.price)
               ? les.price
-              : historyStudent.defaultPrice || 1500;
+              : historyStudent.defaultPrice || 0;
           var isPastOrDone =
             les.status === 'completed' ||
             Calendar.isLessonInPast(les.date, les.endTime);
@@ -726,8 +748,8 @@
       var defaultColor = editingStu && editingStu.color ? editingStu.color : '#3b82f6';
       var defaultPriceVal =
         editingStu && typeof editingStu.defaultPrice === 'number'
-          ? editingStu.defaultPrice
-          : 1500;
+          ? String(editingStu.defaultPrice)
+          : '';
 
       var formEl = document.createElement('form');
       formEl.id = 'student-directory-form';
@@ -743,7 +765,7 @@
         '<div><label class="field-label" for="stu-form-name">Имя и фамилия *</label>' +
         '<input id="stu-form-name" class="field-input" type="text" required value="' +
         escapeHtml(editingStu ? editingStu.name : '') +
-        '" placeholder="Например, Дмитрий Смирнов" /></div>' +
+        '" placeholder="Введите имя ученика" /></div>' +
         '<div><label class="field-label" for="stu-form-subject">Предмет по умолчанию</label>' +
         '<select id="stu-form-subject" class="field-select">' +
         '<option value="eng"' +
@@ -754,9 +776,9 @@
         '>🇷🇺 Русский язык (RUS)</option>' +
         '</select></div>' +
         '<div><label class="field-label" for="stu-form-price">Стоимость урока (₽)</label>' +
-        '<input id="stu-form-price" class="field-input font-mono-tabular" type="number" min="0" step="50" required value="' +
-        escapeHtml(String(defaultPriceVal)) +
-        '" /></div>' +
+        '<input id="stu-form-price" class="field-input font-mono-tabular" type="number" min="0" step="50" value="' +
+        escapeHtml(defaultPriceVal) +
+        '" placeholder="Укажите сумму" /></div>' +
         '</div>' +
         '<div class="form-row-2">' +
         '<div><label class="field-label" for="stu-form-notes">Заметка об ученике (уровень, цели, учебник)</label>' +
@@ -782,108 +804,124 @@
       fragment.appendChild(formEl);
     }
 
-    var gridWrap = document.createElement('div');
-    gridWrap.className = 'students-grid';
-
-    for (var sIdx = 0; sIdx < state.students.length; sIdx++) {
-      var stu = state.students[sIdx];
-      var sStats = statsMap[stu.id] || {
-        totalCount: 0,
-        activeCount: 0,
-        completedCount: 0,
-        paidCount: 0,
-        paidAmount: 0,
-        unpaidPastCount: 0,
-        unpaidPastAmount: 0,
-      };
-      var stuColor = stu.color || '#3b82f6';
-      var stuPrice =
-        typeof stu.defaultPrice === 'number' && !isNaN(stu.defaultPrice)
-          ? stu.defaultPrice
-          : 1500;
-
-      var cardEl = document.createElement('div');
-      cardEl.className = 'student-card';
-      cardEl.setAttribute('data-testid', 'student-row-' + stu.id);
-
-      cardEl.innerHTML =
-        '<div>' +
-        '<div class="student-card-header">' +
-        '<div>' +
-        '<h3 class="student-name" style="display:flex;align-items:center;gap:7px;">' +
-        '<span class="student-color-dot" style="width:12px;height:12px;background-color:' +
-        escapeHtml(stuColor) +
-        ';"></span>' +
-        '<span>' +
-        escapeHtml(stu.name) +
-        '</span>' +
-        '</h3>' +
-        '<div class="student-meta font-mono-tabular">' +
-        '<span class="' +
-        (stu.defaultSubject === 'rus' ? 'text-rus' : 'text-eng') +
-        '" style="font-weight:600;">' +
-        (stu.defaultSubject === 'rus'
-          ? '🇷🇺 Русский (RUS)'
-          : '🇬🇧 Английский (ENG)') +
-        '</span>' +
-        ' · <strong style="color:#0f172a;">' +
-        Calendar.formatCurrency(stuPrice) +
-        '/ур.</strong>' +
-        '</div>' +
-        '</div>' +
-        '<div style="display:flex;gap:4px;">' +
-        '<button type="button" class="modal-close-btn" data-action="edit-student" data-student-id="' +
-        escapeHtml(stu.id) +
-        '" aria-label="Редактировать ' +
-        escapeHtml(stu.name) +
-        '">' +
-        ICONS.edit +
-        '</button>' +
-        '<button type="button" class="modal-close-btn" data-action="delete-student" data-student-id="' +
-        escapeHtml(stu.id) +
-        '" aria-label="Удалить ' +
-        escapeHtml(stu.name) +
-        '">' +
-        ICONS.trash +
-        '</button>' +
-        '</div></div>' +
-        (stu.notes ? '<p class="student-notes">' + escapeHtml(stu.notes) + '</p>' : '') +
-        (stu.teacherNoteActive && stu.teacherNote
-          ? '<div class="lesson-teacher-note-chip" style="margin-top:8px;">📌 Заметка для учителя: ' +
-            escapeHtml(stu.teacherNote) +
-            '</div>'
-          : '') +
-        '</div>' +
-        '<div class="student-card-footer">' +
-        '<div class="font-mono-tabular" style="font-size:11.5px;color:#64748b;">' +
-        'Проведено: <strong style="color:#0f172a;">' +
-        sStats.completedCount +
-        '</strong>' +
-        ' · <span class="text-paid">Опл: ' +
-        sStats.paidCount +
-        ' (' +
-        Calendar.formatCurrency(sStats.paidAmount) +
-        ')</span>' +
-        (sStats.unpaidPastCount > 0
-          ? ' · <span class="text-unpaid">Долг: ' +
-            sStats.unpaidPastCount +
-            ' (' +
-            Calendar.formatCurrency(sStats.unpaidPastAmount) +
-            ')</span>'
-          : '') +
-        '</div>' +
-        '<button type="button" class="btn-secondary" style="padding:6px 12px;font-size:12px;" data-action="open-student-history" data-student-id="' +
-        escapeHtml(stu.id) +
-        '">' +
-        ICONS.history +
-        '<span>История занятий</span>' +
-        '</button>' +
+    if (state.students.length === 0 && !state.isStudentFormOpen) {
+      var emptyWrap = document.createElement('div');
+      emptyWrap.className = 'subpanel-box';
+      emptyWrap.style.textAlign = 'center';
+      emptyWrap.style.padding = '28px 16px';
+      emptyWrap.innerHTML =
+        '<strong style="font-size:15px;">Список учеников пока пуст</strong>' +
+        '<p style="margin:4px 0 12px 0;font-size:12.5px;color:#64748b;">Добавьте своего первого ученика или синхронизируйте данные со второго устройства в 2 клика.</p>' +
+        '<div style="display:flex;justify-content:center;gap:10px;flex-wrap:wrap;">' +
+        '<button type="button" class="btn-primary" data-action="empty-open-add-student">+ Добавить ученика</button>' +
+        '<button type="button" class="btn-secondary" data-action="empty-open-sync">🔄 Синхронизировать со второго устройства</button>' +
         '</div>';
+      fragment.appendChild(emptyWrap);
+    } else {
+      var gridWrap = document.createElement('div');
+      gridWrap.className = 'students-grid';
 
-      gridWrap.appendChild(cardEl);
+      for (var sIdx = 0; sIdx < state.students.length; sIdx++) {
+        var stu = state.students[sIdx];
+        var sStats = statsMap[stu.id] || {
+          totalCount: 0,
+          activeCount: 0,
+          completedCount: 0,
+          paidCount: 0,
+          paidAmount: 0,
+          unpaidPastCount: 0,
+          unpaidPastAmount: 0,
+        };
+        var stuColor = stu.color || '#3b82f6';
+        var stuPrice =
+          typeof stu.defaultPrice === 'number' && !isNaN(stu.defaultPrice)
+            ? stu.defaultPrice
+            : 0;
+
+        var cardEl = document.createElement('div');
+        cardEl.className = 'student-card';
+        cardEl.setAttribute('data-testid', 'student-row-' + stu.id);
+
+        cardEl.innerHTML =
+          '<div>' +
+          '<div class="student-card-header">' +
+          '<div>' +
+          '<h3 class="student-name" style="display:flex;align-items:center;gap:7px;">' +
+          '<span class="student-color-dot" style="width:12px;height:12px;background-color:' +
+          escapeHtml(stuColor) +
+          ';"></span>' +
+          '<span>' +
+          escapeHtml(stu.name) +
+          '</span>' +
+          '</h3>' +
+          '<div class="student-meta font-mono-tabular">' +
+          '<span class="' +
+          (stu.defaultSubject === 'rus' ? 'text-rus' : 'text-eng') +
+          '" style="font-weight:600;">' +
+          (stu.defaultSubject === 'rus'
+            ? '🇷🇺 Русский (RUS)'
+            : '🇬🇧 Английский (ENG)') +
+          '</span>' +
+          ' · <strong style="color:#0f172a;">' +
+          Calendar.formatCurrency(stuPrice) +
+          '/ур.</strong>' +
+          '</div>' +
+          '</div>' +
+          '<div style="display:flex;gap:4px;">' +
+          '<button type="button" class="modal-close-btn" data-action="edit-student" data-student-id="' +
+          escapeHtml(stu.id) +
+          '" aria-label="Редактировать ' +
+          escapeHtml(stu.name) +
+          '">' +
+          ICONS.edit +
+          '</button>' +
+          '<button type="button" class="modal-close-btn" data-action="delete-student" data-student-id="' +
+          escapeHtml(stu.id) +
+          '" aria-label="Удалить ' +
+          escapeHtml(stu.name) +
+          '">' +
+          ICONS.trash +
+          '</button>' +
+          '</div></div>' +
+          (stu.notes ? '<p class="student-notes">' + escapeHtml(stu.notes) + '</p>' : '') +
+          (stu.teacherNoteActive && stu.teacherNote
+            ? '<div class="lesson-teacher-note-chip" style="margin-top:8px;">📌 Заметка для учителя: ' +
+              escapeHtml(stu.teacherNote) +
+              '</div>'
+            : '') +
+          '</div>' +
+          '<div class="student-card-footer">' +
+          '<div class="font-mono-tabular" style="font-size:11.5px;color:#64748b;">' +
+          'Проведено: <strong style="color:#0f172a;">' +
+          sStats.completedCount +
+          '</strong>' +
+          ' · <span class="text-paid">Опл: ' +
+          sStats.paidCount +
+          ' (' +
+          Calendar.formatCurrency(sStats.paidAmount) +
+          ')</span>' +
+          (sStats.unpaidPastCount > 0
+            ? ' · <span class="text-unpaid">Долг: ' +
+              sStats.unpaidPastCount +
+              ' (' +
+              Calendar.formatCurrency(sStats.unpaidPastAmount) +
+              ')</span>'
+            : '') +
+          '</div>' +
+          '<button type="button" class="btn-secondary" style="padding:6px 12px;font-size:12px;" data-action="open-student-history" data-student-id="' +
+          escapeHtml(stu.id) +
+          '">' +
+          ICONS.history +
+          '<span>История занятий</span>' +
+          '</button>' +
+          '</div>';
+
+        gridWrap.appendChild(cardEl);
+      }
+
+      fragment.appendChild(gridWrap);
     }
 
-    fragment.appendChild(gridWrap);
     container.textContent = '';
     container.appendChild(fragment);
   }
@@ -978,8 +1016,56 @@
     }
   }
 
+  function renderSyncModalContent(state) {
+    var Store = root.TutorPlanner.Store;
+    var activeTab = state.syncActiveTab || 'send';
+    var tabSendBtn = document.getElementById('sync-tab-btn-send');
+    var tabReceiveBtn = document.getElementById('sync-tab-btn-receive');
+    var panelSend = document.getElementById('sync-panel-send');
+    var panelReceive = document.getElementById('sync-panel-receive');
+    var codeEl = document.getElementById('sync-generated-code');
+
+    if (tabSendBtn) {
+      tabSendBtn.className = 'sync-tab-btn' + (activeTab === 'send' ? ' active' : '');
+      tabSendBtn.setAttribute('aria-selected', activeTab === 'send' ? 'true' : 'false');
+    }
+    if (tabReceiveBtn) {
+      tabReceiveBtn.className = 'sync-tab-btn' + (activeTab === 'receive' ? ' active' : '');
+      tabReceiveBtn.setAttribute('aria-selected', activeTab === 'receive' ? 'true' : 'false');
+    }
+
+    if (panelSend) {
+      panelSend.style.display = activeTab === 'send' ? 'flex' : 'none';
+    }
+    if (panelReceive) {
+      panelReceive.style.display = activeTab === 'receive' ? 'flex' : 'none';
+    }
+
+    if (codeEl && state.syncHostCode) {
+      codeEl.textContent = formatSixDigitCode(state.syncHostCode);
+    }
+
+    var pairedCode =
+      Store && typeof Store.getPairedDeviceCode === 'function'
+        ? Store.getPairedDeviceCode()
+        : '';
+    var rememberedBanner = document.getElementById('sync-remembered-banner');
+    var rememberedCodeLabel = document.getElementById('sync-remembered-code-label');
+    if (rememberedBanner) {
+      if (pairedCode) {
+        rememberedBanner.style.display = 'flex';
+        if (rememberedCodeLabel) {
+          rememberedCodeLabel.textContent = formatSixDigitCode(pairedCode);
+        }
+      } else {
+        rememberedBanner.style.display = 'none';
+      }
+    }
+  }
+
   var UI = {
     escapeHtml: escapeHtml,
+    formatSixDigitCode: formatSixDigitCode,
     renderColorPresetsHtml: renderColorPresetsHtml,
     renderHeaderControls: renderHeaderControls,
     renderDashboard: renderDashboard,
@@ -987,6 +1073,7 @@
     updateSmartHomeworkBox: updateSmartHomeworkBox,
     renderStudentsModalContent: renderStudentsModalContent,
     renderAutoTransferModalContent: renderAutoTransferModalContent,
+    renderSyncModalContent: renderSyncModalContent,
   };
 
   root.TutorPlanner = root.TutorPlanner || {};

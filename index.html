@@ -4,9 +4,9 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Планер репетитора — Расписание и учет занятий</title>
-    <meta name="description" content="Веб-приложение для преподавателей английского и русского языков: недельная сетка расписания, статус оплаты уроков, база учеников, заметки для учителя и автоперенос расписания." />
+    <meta name="description" content="Веб-приложение для преподавателей английского и русского языков: недельная сетка расписания, статус оплаты уроков, база учеников, заметки для учителя и синхронизация устройств." />
     <meta property="og:title" content="Планер репетитора — Расписание и учет занятий" />
-    <meta property="og:description" content="Веб-приложение для преподавателей английского и русского языков: недельная сетка расписания, статус оплаты уроков, база учеников, заметки для учителя и автоперенос расписания." />
+    <meta property="og:description" content="Веб-приложение для преподавателей английского и русского языков: недельная сетка расписания, статус оплаты уроков, база учеников, заметки для учителя и синхронизация устройств." />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
     <link rel="manifest" href="manifest.json" />
@@ -14,7 +14,7 @@
   </head>
   <body>
     <div class="app-shell">
-      <!-- Темно-синяя шапка приложения как на рендере -->
+      <!-- Темно-синяя шапка приложения -->
       <div class="header-wrapper">
         <header class="container-wide top-bar">
           <div class="brand-lockup">
@@ -35,6 +35,8 @@
                 <button type="button" class="brand-sub-link" data-nav-action="planner">Уроки</button>
                 <span class="brand-sub-dot" aria-hidden="true">•</span>
                 <button type="button" class="brand-sub-link" data-nav-action="students">Ученики</button>
+                <span class="brand-sub-dot" aria-hidden="true">•</span>
+                <button type="button" class="brand-sub-link" data-nav-action="sync">Синхронизация</button>
                 <span class="brand-sub-dot" aria-hidden="true">•</span>
                 <button type="button" class="brand-sub-link" data-nav-action="stats">Результаты</button>
               </div>
@@ -58,8 +60,8 @@
               type="button"
               id="header-menu-toggle-btn"
               class="header-icon-btn"
-              aria-label="Дополнительные настройки и импорт/экспорт"
-              title="Настройки, вид расписания и резервная копия"
+              aria-label="Дополнительные настройки и синхронизация устройств"
+              title="Настройки, вид расписания и синхронизация устройств"
             >
               <svg viewBox="0 0 24 24" fill="currentColor" class="header-action-svg">
                 <circle cx="12" cy="5" r="2" />
@@ -90,7 +92,7 @@
                 <line x1="3" y1="10" x2="21" y2="10" />
               </svg>
               <div id="week-range-label" data-testid="week-range-label" class="week-range-label font-mono-tabular">
-                26 окт – 1 ноя 2026
+                Текущая неделя
               </div>
               <button type="button" id="btn-today-week" class="week-today-chip" title="Вернуться на текущую неделю">
                 Сегодня
@@ -109,14 +111,14 @@
             <div id="week-day-tabs-container" class="week-day-tabs"></div>
           </section>
 
-          <!-- Панель быстрых действий (Все ученики, Автозаполнение, Экспорт JSON, + Добавить урок) -->
+          <!-- Панель быстрых действий (Все ученики, Автозаполнение, Синхронизация устройств, + Добавить урок) -->
           <div class="action-pills-bar">
             <div class="action-pills-left">
               <button type="button" id="open-students-btn" class="pill-btn pill-btn-students">
                 <svg viewBox="0 0 24 24" fill="currentColor" class="pill-icon-svg" aria-hidden="true">
                   <path d="M12 12c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm0 2c-3.33 0-10 1.67-10 5v2h20v-2c0-3.33-6.67-5-10-5z" />
                 </svg>
-                <span>Все ученики (<span id="students-count-badge">4</span>)</span>
+                <span>Все ученики (<span id="students-count-badge">0</span>)</span>
               </button>
 
               <span
@@ -131,22 +133,42 @@
             </div>
 
             <div class="action-pills-right">
-              <button type="button" id="export-json-btn" class="pill-btn pill-btn-export">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="pill-icon-svg" aria-hidden="true">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke-linecap="round" stroke-linejoin="round" />
-                  <polyline points="17 8 12 3 7 8" stroke-linecap="round" stroke-linejoin="round" />
-                  <line x1="12" y1="3" x2="12" y2="15" stroke-linecap="round" stroke-linejoin="round" />
-                </svg>
-                <span>Экспорт (JSON)</span>
+              <button
+                type="button"
+                id="quick-oneclick-sync-header-btn"
+                class="pill-btn pill-btn-sync-fast"
+                style="display: none;"
+                title="Мгновенное обновление со связанным устройством в 1 нажатие"
+              >
+                <span>⚡ Обновить сейчас</span>
               </button>
 
-              <button type="button" id="import-json-btn" class="pill-btn pill-btn-import" title="Импортировать базу из JSON">
+              <button
+                type="button"
+                id="open-sync-modal-btn"
+                data-testid="open-sync-modal-btn"
+                class="pill-btn pill-btn-sync"
+                title="Синхронизация по 6-значному коду или передача на планшет/телефон"
+              >
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="pill-icon-svg" aria-hidden="true">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke-linecap="round" stroke-linejoin="round" />
-                  <polyline points="7 10 12 15 17 10" stroke-linecap="round" stroke-linejoin="round" />
-                  <line x1="12" y1="15" x2="12" y2="3" stroke-linecap="round" stroke-linejoin="round" />
+                  <polyline points="17 2 21 6 17 10" stroke-linecap="round" stroke-linejoin="round" />
+                  <path d="M3 11V9a4 4 0 0 1 4-4h14" stroke-linecap="round" />
+                  <polyline points="7 22 3 18 7 14" stroke-linecap="round" stroke-linejoin="round" />
+                  <path d="M21 13v2a4 4 0 0 1-4 4H3" stroke-linecap="round" />
                 </svg>
-                <span>Импорт</span>
+                <span>Синхронизация устройств</span>
+              </button>
+
+              <button
+                type="button"
+                id="import-json-btn"
+                class="pill-btn pill-btn-import"
+                title="Принять и объединить расписание из полученного файла"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="pill-icon-svg" aria-hidden="true">
+                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+                <span>Объединить расписание</span>
               </button>
 
               <input
@@ -154,7 +176,7 @@
                 type="file"
                 accept=".json,application/json"
                 style="display: none;"
-                aria-label="Импорт базы (JSON)"
+                aria-label="Принять файл синхронизации"
               />
 
               <button type="button" id="header-add-lesson-btn" class="pill-btn pill-btn-add">
@@ -167,7 +189,7 @@
             </div>
           </div>
 
-          <!-- Выдвижная панель фильтров, вида расписания и даты (открывается по иконкам поиска/меню/настроек) -->
+          <!-- Выдвижная панель фильтров, вида расписания и даты -->
           <div id="toolbar-settings-drawer" class="toolbar-drawer">
             <div class="toolbar-group">
               <div role="group" aria-label="Расположение дней недели" class="segmented-group">
@@ -204,20 +226,20 @@
               </div>
             </div>
 
-            <!-- Совместимость мобильных контролов -->
+            <!-- Мобильные кнопки быстрого доступа -->
             <div class="mobile-actions-bar" style="display: none;">
               <button type="button" id="open-students-btn-mobile" class="mobile-util-btn">
-                База учеников (<span id="students-count-badge-mobile">4</span>)
+                База учеников (<span id="students-count-badge-mobile">0</span>)
               </button>
               <span id="autosync-status-indicator-mobile" class="autosync-status-mobile">
                 <span class="autosync-dot" aria-hidden="true"></span>
                 <span id="autosync-status-text-mobile">Автозаполнение до конца месяца</span>
               </span>
-              <button type="button" id="export-json-btn-mobile" class="mobile-util-btn">
-                Экспорт JSON
+              <button type="button" id="open-sync-modal-btn-mobile" class="mobile-util-btn">
+                🔄 Синхронизация по коду
               </button>
               <button type="button" id="import-json-btn-mobile" class="mobile-util-btn">
-                Импорт JSON
+                📂 Объединить расписание
               </button>
             </div>
           </div>
@@ -230,7 +252,7 @@
             </div>
           </div>
 
-          <!-- 4 карточки сводки за неделю (как на рендере) -->
+          <!-- 4 карточки сводки за неделю -->
           <section id="stats-dashboard-section" aria-label="Сводка за выбранную неделю" class="dashboard-section">
             <div class="kpi-cards-grid">
               <!-- Карточка 1: Всего уроков на неделю -->
@@ -243,9 +265,9 @@
                 <div class="kpi-card-content">
                   <span class="kpi-card-label">Всего уроков<br />на неделю</span>
                   <div class="kpi-card-value-row font-mono-tabular">
-                    <span id="dashboard-total-lessons" data-testid="dashboard-total-lessons" class="kpi-big-number kpi-color-dark">7</span>
+                    <span id="dashboard-total-lessons" data-testid="dashboard-total-lessons" class="kpi-big-number kpi-color-dark">0</span>
                     <span class="kpi-inline-sub">
-                      ENG: <strong id="dashboard-eng-lessons">3</strong> · RUS: <strong id="dashboard-rus-lessons">4</strong>
+                      ENG: <strong id="dashboard-eng-lessons">0</strong> · RUS: <strong id="dashboard-rus-lessons">0</strong>
                     </span>
                   </div>
                 </div>
@@ -261,7 +283,7 @@
                 <div class="kpi-card-content">
                   <span class="kpi-card-label">Проведено</span>
                   <div class="kpi-card-value-row font-mono-tabular">
-                    <span id="dashboard-completed-count" class="kpi-big-number kpi-color-green">3</span>
+                    <span id="dashboard-completed-count" class="kpi-big-number kpi-color-green">0</span>
                   </div>
                   <div id="dashboard-completed-text" class="kpi-micro-note font-mono-tabular" style="display: none;"></div>
                   <div id="dashboard-paid-amount" data-testid="dashboard-paid-amount" class="kpi-micro-note text-paid font-mono-tabular"></div>
@@ -279,7 +301,7 @@
                 <div class="kpi-card-content">
                   <span class="kpi-card-label">Запланировано</span>
                   <div class="kpi-card-value-row font-mono-tabular">
-                    <span id="dashboard-planned-count" class="kpi-big-number kpi-color-blue">1</span>
+                    <span id="dashboard-planned-count" class="kpi-big-number kpi-color-blue">0</span>
                   </div>
                   <div id="dashboard-active-filter" class="kpi-micro-note" style="display: none; align-items: center; gap: 6px;">
                     <span>Фильтр: <strong id="dashboard-filter-text"></strong></span>
@@ -296,7 +318,7 @@
                 <div class="kpi-card-content">
                   <span class="kpi-card-label kpi-label-red">Не оплачено</span>
                   <div class="kpi-card-value-row font-mono-tabular">
-                    <span id="dashboard-unpaid-count" class="kpi-big-number kpi-color-red">3</span>
+                    <span id="dashboard-unpaid-count" class="kpi-big-number kpi-color-red">0</span>
                   </div>
                   <div id="dashboard-unpaid-amount" data-testid="dashboard-unpaid-amount" class="kpi-micro-note text-unpaid font-mono-tabular"></div>
                 </div>
@@ -311,7 +333,7 @@
         </div>
       </div>
 
-      <!-- Нижняя панель навигации как на рендере -->
+      <!-- Нижняя панель навигации -->
       <nav aria-label="Нижняя навигация" class="bottom-tab-bar">
         <div class="container-wide bottom-tab-inner">
           <button type="button" class="bottom-tab-item active" data-bottom-nav="planner">
@@ -332,19 +354,20 @@
             <span>Ученики</span>
           </button>
 
-          <button type="button" class="bottom-tab-item" data-bottom-nav="stats">
+          <button type="button" class="bottom-tab-item" data-bottom-nav="sync">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" class="bottom-tab-svg">
-              <line x1="6" y1="20" x2="6" y2="14" stroke-linecap="round" />
-              <line x1="12" y1="20" x2="12" y2="4" stroke-linecap="round" />
-              <line x1="18" y1="20" x2="18" y2="10" stroke-linecap="round" />
+              <polyline points="17 2 21 6 17 10" stroke-linecap="round" stroke-linejoin="round" />
+              <path d="M3 11V9a4 4 0 0 1 4-4h14" stroke-linecap="round" />
+              <polyline points="7 22 3 18 7 14" stroke-linecap="round" stroke-linejoin="round" />
+              <path d="M21 13v2a4 4 0 0 1-4 4H3" stroke-linecap="round" />
             </svg>
-            <span>Статистика</span>
+            <span>Синхронизация</span>
           </button>
 
           <button type="button" class="bottom-tab-item" data-bottom-nav="settings">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="bottom-tab-svg">
               <circle cx="12" cy="12" r="3" />
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
             </svg>
             <span>Настройки</span>
           </button>
@@ -380,7 +403,7 @@
                   <div class="form-row-3">
                     <div>
                       <label for="quick-stu-name" class="field-label">Имя ученика *</label>
-                      <input id="quick-stu-name" type="text" class="field-input" placeholder="Мария Иванова" />
+                      <input id="quick-stu-name" type="text" class="field-input" placeholder="Введите имя и фамилию" />
                     </div>
                     <div>
                       <label for="quick-stu-subject" class="field-label">Предмет</label>
@@ -391,13 +414,13 @@
                     </div>
                     <div>
                       <label for="quick-stu-price" class="field-label">Стоимость урока (₽)</label>
-                      <input id="quick-stu-price" type="number" min="0" step="50" value="1500" class="field-input font-mono-tabular" />
+                      <input id="quick-stu-price" type="number" min="0" step="50" value="" placeholder="Укажите сумму" class="field-input font-mono-tabular" />
                     </div>
                   </div>
                   <div class="form-row-2">
                     <div>
                       <label for="quick-stu-notes" class="field-label">Заметка (уровень, цели, учебник)</label>
-                      <input id="quick-stu-notes" type="text" class="field-input" placeholder="Например: B1, подготовка к ОГЭ" />
+                      <input id="quick-stu-notes" type="text" class="field-input" placeholder="Например: подготовка к экзамену" />
                     </div>
                     <div>
                       <label for="quick-stu-color" class="field-label">Цвет ученика в расписании</label>
@@ -544,11 +567,11 @@
                 <div class="form-row-2">
                   <div>
                     <label for="lesson-price" class="field-label">Стоимость урока (₽)</label>
-                    <input id="lesson-price" type="number" min="0" step="50" value="1500" class="field-input font-mono-tabular" required />
+                    <input id="lesson-price" type="number" min="0" step="50" value="" placeholder="0" class="field-input font-mono-tabular" />
                   </div>
                   <div>
                     <label for="lesson-payment-note" class="field-label">Примечание к оплате урока (необязательно)</label>
-                    <input id="lesson-payment-note" type="text" class="field-input" placeholder="Например: Абонемент (урок 2 из 4), СБП..." />
+                    <input id="lesson-payment-note" type="text" class="field-input" placeholder="Например: Абонемент, СБП..." />
                   </div>
                 </div>
               </div>
@@ -665,6 +688,182 @@
             <div style="display: flex; gap: 8px; margin-left: auto;">
               <button type="button" class="btn-secondary" data-action="close-modal">Отмена</button>
               <button type="button" id="confirm-autotransfer-btn" class="btn-primary">Перенести уроки</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Модальное окно 4: 🔄 Синхронизация устройств (По 6-значному коду + Bluetooth / Quick Share + Smart Merge) -->
+      <div id="sync-modal" role="dialog" aria-modal="true" aria-labelledby="sync-modal-title" class="modal-backdrop hidden">
+        <div class="modal-window modal-md">
+          <div class="modal-header">
+            <div>
+              <h2 id="sync-modal-title" class="modal-title">🔄 Синхронизация устройств</h2>
+              <p class="modal-subtitle">
+                Телефон ↔ Планшет ↔ Компьютер · Умное объединение расписания без потери уроков
+              </p>
+            </div>
+            <button type="button" class="modal-close-btn" data-action="close-modal" aria-label="Закрыть окно синхронизации">✕</button>
+          </div>
+
+          <div class="modal-body">
+            <!-- Блок быстрого обновления в 1 клик, если устройство уже запомнено -->
+            <div id="sync-remembered-banner" class="sync-remembered-card" style="display: none;">
+              <div class="sync-remembered-info">
+                <span class="sync-remembered-title">⚡ Связанное устройство запомнено</span>
+                <span class="sync-remembered-sub">Код связи: <strong id="sync-remembered-code-label" class="font-mono-tabular">---</strong></span>
+              </div>
+              <div class="sync-remembered-actions">
+                <button type="button" id="sync-oneclick-now-btn" class="btn-primary">
+                  Обновить сейчас
+                </button>
+                <button type="button" id="sync-forget-device-btn" class="btn-link-muted">
+                  Забыть
+                </button>
+              </div>
+            </div>
+
+            <!-- Две большие понятные вкладки для синхронизации по 6-значному коду -->
+            <div class="sync-tabs-bar" role="tablist" aria-label="Режим синхронизации по коду">
+              <button
+                type="button"
+                id="sync-tab-btn-send"
+                role="tab"
+                aria-selected="true"
+                class="sync-tab-btn active"
+                data-sync-tab="send"
+              >
+                📤 Отправить / Связать устройство
+              </button>
+              <button
+                type="button"
+                id="sync-tab-btn-receive"
+                role="tab"
+                aria-selected="false"
+                class="sync-tab-btn"
+                data-sync-tab="receive"
+              >
+                🔢 Ввести код с другого устройства
+              </button>
+            </div>
+
+            <!-- Вкладка 1: Отправить / Связать устройство (Генерация 6-значного кода) -->
+            <div id="sync-panel-send" class="sync-panel-box">
+              <p class="sync-helper-text">
+                Откройте «Синхронизацию устройств» на втором устройстве, перейдите на вкладку <strong>«Ввести код»</strong> и укажите эти 6 цифр:
+              </p>
+
+              <div class="sync-code-display-wrap">
+                <div
+                  id="sync-generated-code"
+                  data-testid="sync-generated-code"
+                  class="sync-code-digits font-mono-tabular"
+                >
+                  ---
+                </div>
+                <div class="sync-code-mini-actions">
+                  <button type="button" id="sync-copy-code-btn" class="btn-secondary" style="padding: 6px 12px; font-size: 12px;">
+                    Скопировать код
+                  </button>
+                  <button type="button" id="sync-regenerate-code-btn" class="btn-secondary" style="padding: 6px 12px; font-size: 12px;">
+                    Новый код
+                  </button>
+                </div>
+              </div>
+
+              <label class="checkbox-label" style="justify-content: center; margin-top: 2px;">
+                <input id="sync-remember-host-check" type="checkbox" checked />
+                <span>Запомнить это устройство (в следующий раз обновление в 1 нажатие)</span>
+              </label>
+
+              <div id="sync-host-status" class="sync-status-pill">
+                <span class="sync-pulse-dot" aria-hidden="true"></span>
+                <span id="sync-host-status-text">Готово к подключению второго устройства...</span>
+              </div>
+            </div>
+
+            <!-- Вкладка 2: Ввести код с другого устройства -->
+            <div id="sync-panel-receive" class="sync-panel-box" style="display: none;">
+              <p class="sync-helper-text">
+                Введите 6-значный код, который сейчас показан на экране вашего второго устройства:
+              </p>
+
+              <div class="sync-code-input-row">
+                <input
+                  id="sync-input-code"
+                  data-testid="sync-input-code"
+                  type="text"
+                  inputmode="numeric"
+                  autocomplete="off"
+                  maxlength="7"
+                  placeholder="000-000"
+                  class="sync-code-input font-mono-tabular"
+                  aria-label="6-значный код синхронизации"
+                />
+                <button
+                  type="button"
+                  id="sync-connect-code-btn"
+                  data-testid="sync-connect-code-btn"
+                  class="btn-primary sync-connect-btn"
+                >
+                  Синхронизировать
+                </button>
+              </div>
+
+              <label class="checkbox-label" style="justify-content: center;">
+                <input id="sync-remember-device-check" type="checkbox" checked />
+                <span>Запомнить это устройство (для обновления в 1 нажатие)</span>
+              </label>
+
+              <div id="sync-join-status" class="sync-status-pill" style="display: none;">
+                <span class="sync-pulse-dot" aria-hidden="true"></span>
+                <span id="sync-join-status-text">Подключение...</span>
+              </div>
+            </div>
+
+            <!-- Зеленый блок отчета после успешной синхронизации -->
+            <div id="sync-success-report" data-testid="sync-success-report" class="sync-success-card" style="display: none;">
+              <div class="sync-success-title">✅ Устройства успешно синхронизированы!</div>
+              <div id="sync-success-details" class="sync-success-details font-mono-tabular"></div>
+            </div>
+
+            <!-- Способ 2: Офлайн-передача в 1 касание через системную шторку Android (Bluetooth / Quick Share / Мессенджеры) -->
+            <div class="sync-offline-section">
+              <div class="sync-offline-header">
+                <strong class="sync-offline-title">Передача без интернета (Bluetooth / Quick Share)</strong>
+                <span class="sync-offline-sub">
+                  Передайте расписание напрямую через шторку телефона или примите полученный файл — расписания аккуратно объединятся без затирания уроков:
+                </span>
+              </div>
+
+              <div class="sync-offline-buttons">
+                <button
+                  type="button"
+                  id="sync-android-share-btn"
+                  data-testid="sync-android-share-btn"
+                  class="sync-share-big-btn primary-share"
+                >
+                  <span>📲 Передать через Bluetooth / Quick Share</span>
+                </button>
+
+                <button
+                  type="button"
+                  id="sync-accept-file-btn"
+                  data-testid="sync-accept-file-btn"
+                  class="sync-share-big-btn secondary-share"
+                >
+                  <span>📂 Принять файл синхронизации</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="modal-footer">
+            <button type="button" id="export-json-btn" class="btn-link-muted" title="Сохранить копию расписания в память устройства">
+              💾 Сохранить резервную копию на устройство
+            </button>
+            <div style="display: flex; gap: 8px; margin-left: auto;">
+              <button type="button" class="btn-secondary" data-action="close-modal">Готово</button>
             </div>
           </div>
         </div>

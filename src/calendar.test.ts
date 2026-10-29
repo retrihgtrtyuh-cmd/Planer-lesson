@@ -28,6 +28,13 @@ test('addMinutesToTime defaults to 1 hour (60 min) and supports custom durations
   assert.equal(Calendar.formatCurrency(0), '0 ₽');
 });
 
+test('createInitialDemoData starts completely empty without fictional students or lessons', () => {
+  const initial = Store.createInitialDemoData();
+  assert.deepEqual(initial.students, []);
+  assert.deepEqual(initial.lessons, []);
+  assert.deepEqual(initial.deletedIds, []);
+});
+
 test('isLessonInPast and autoCompletePastLessons automatically mark past planned lessons as completed', () => {
   const now = new Date(2026, 9, 28, 16, 30, 0); // Oct 28, 2026, 16:30 local
 
@@ -136,7 +143,6 @@ test('calculateWeeklyStats counts paid sums and ONLY counts past/completed lesso
   assert.equal(stats.cancelledLessons, 1);
   assert.equal(stats.paidLessonsCount, 1);
   assert.equal(stats.paidAmount, 1800);
-  // Only lesson #2 is unpaid in the past; lesson #3 is in the future and excluded from unpaid debt
   assert.equal(stats.unpaidLessonsCount, 1);
   assert.equal(stats.unpaidAmount, 1600);
 });
@@ -235,7 +241,7 @@ test('resolveActiveTeacherNote returns active teacher note across subsequent les
   assert.equal(disabledNote.text, '');
 });
 
-test('serializeDatabaseBackup and parseDatabaseBackupJSON preserve defaultPrice, color, and lesson price', () => {
+test('serializeDatabaseBackup and parseDatabaseBackupJSON preserve defaultPrice, color, updatedAt, and deletedIds', () => {
   const students = [
     {
       id: 'stu_1',
@@ -246,6 +252,7 @@ test('serializeDatabaseBackup and parseDatabaseBackupJSON preserve defaultPrice,
       notes: 'B1',
       teacherNote: 'Заметка учителю',
       teacherNoteActive: true,
+      updatedAt: 1700000005000,
     },
   ];
   const lessons = [
@@ -265,17 +272,221 @@ test('serializeDatabaseBackup and parseDatabaseBackupJSON preserve defaultPrice,
       paymentNote: 'Оплачено',
       teacherNote: 'Заметка учителю',
       teacherNoteActive: true,
+      updatedAt: 1700000010000,
     },
   ];
+  const deletedIds = [{ id: 'les_deleted_99', deletedAt: 1700000020000 }];
 
-  const json = Store.serializeDatabaseBackup(students, lessons);
+  const json = Store.serializeDatabaseBackup(students, lessons, deletedIds);
   const parsed = Store.parseDatabaseBackupJSON(json);
   assert.equal(parsed.students.length, 1);
   assert.equal(parsed.students[0].defaultPrice, 2000);
   assert.equal(parsed.students[0].color, '#ec4899');
+  assert.equal(parsed.students[0].updatedAt, 1700000005000);
   assert.equal(parsed.lessons.length, 1);
   assert.equal(parsed.lessons[0].price, 2000);
   assert.equal(parsed.lessons[0].isPaid, true);
+  assert.equal(parsed.lessons[0].updatedAt, 1700000010000);
+  assert.equal(parsed.deletedIds.length, 1);
+  assert.equal(parsed.deletedIds[0].id, 'les_deleted_99');
+});
+
+test('Smart Merge (mergeSyncData) merges new records, picks fresher updatedAt on conflicts, and honors deletedIds tombstones', () => {
+  const localState = {
+    students: [
+      {
+        id: 'stu_common',
+        name: 'Алина Соколова',
+        defaultSubject: 'eng',
+        defaultPrice: 1500,
+        color: '#3b82f6',
+        notes: 'Старая заметка',
+        updatedAt: 1000,
+      },
+      {
+        id: 'stu_only_local',
+        name: 'Локальный Ученик',
+        defaultSubject: 'rus',
+        defaultPrice: 1400,
+        color: '#10b981',
+        notes: '',
+        updatedAt: 1000,
+      },
+    ],
+    lessons: [
+      {
+        id: 'les_conflict_remote_newer',
+        studentId: 'stu_common',
+        date: '2026-10-26',
+        startTime: '15:00',
+        endTime: '16:00',
+        subject: 'eng',
+        status: 'planned',
+        price: 1500,
+        classwork: 'Старая тема',
+        homework: '',
+        isPaid: false,
+        updatedAt: 1000,
+      },
+      {
+        id: 'les_conflict_local_newer',
+        studentId: 'stu_common',
+        date: '2026-10-27',
+        startTime: '15:00',
+        endTime: '16:00',
+        subject: 'eng',
+        status: 'completed',
+        price: 1800,
+        classwork: 'Свежая локальная тема',
+        homework: 'ДЗ локальное',
+        isPaid: true,
+        updatedAt: 5000,
+      },
+      {
+        id: 'les_deleted_on_remote',
+        studentId: 'stu_common',
+        date: '2026-10-28',
+        startTime: '15:00',
+        endTime: '16:00',
+        subject: 'eng',
+        status: 'planned',
+        price: 1500,
+        classwork: 'Должен быть удален',
+        homework: '',
+        isPaid: false,
+        updatedAt: 1200,
+      },
+    ],
+    deletedIds: [{ id: 'les_deleted_locally', deletedAt: 3000 }],
+  };
+
+  const incomingData = {
+    students: [
+      {
+        id: 'stu_common',
+        name: 'Алина Соколова',
+        defaultSubject: 'eng',
+        defaultPrice: 2000, // updated on second device
+        color: '#3b82f6',
+        notes: 'Обновленная заметка B2',
+        updatedAt: 2500,
+      },
+      {
+        id: 'stu_new_remote',
+        name: 'Новый Ученик с Планшета',
+        defaultSubject: 'eng',
+        defaultPrice: 1900,
+        color: '#8b5cf6',
+        notes: 'IELTS',
+        updatedAt: 2600,
+      },
+    ],
+    lessons: [
+      {
+        id: 'les_conflict_remote_newer',
+        studentId: 'stu_common',
+        date: '2026-10-26',
+        startTime: '15:00',
+        endTime: '16:00',
+        subject: 'eng',
+        status: 'completed',
+        price: 2000,
+        classwork: 'Новая тема с планшета',
+        homework: 'Ex 5 p. 12',
+        isPaid: true,
+        updatedAt: 3000, // Newer than local 1000
+      },
+      {
+        id: 'les_conflict_local_newer',
+        studentId: 'stu_common',
+        date: '2026-10-27',
+        startTime: '15:00',
+        endTime: '16:00',
+        subject: 'eng',
+        status: 'planned',
+        price: 1500,
+        classwork: 'Устаревшая версия',
+        homework: '',
+        isPaid: false,
+        updatedAt: 2000, // Older than local 5000 -> must NOT overwrite local!
+      },
+      {
+        id: 'les_new_from_remote',
+        studentId: 'stu_new_remote',
+        date: '2026-10-30',
+        startTime: '17:00',
+        endTime: '18:00',
+        subject: 'eng',
+        status: 'planned',
+        price: 1900,
+        classwork: 'Новый урок с планшета',
+        homework: '',
+        isPaid: false,
+        updatedAt: 2700,
+      },
+      {
+        id: 'les_deleted_locally',
+        studentId: 'stu_common',
+        date: '2026-10-29',
+        startTime: '15:00',
+        endTime: '16:00',
+        subject: 'eng',
+        status: 'planned',
+        price: 1500,
+        classwork: 'Урок, который уже удалили на первом устройстве',
+        homework: '',
+        isPaid: false,
+        updatedAt: 1500, // Older than local deletedAt 3000 -> must NOT resurrect!
+      },
+    ],
+    deletedIds: [{ id: 'les_deleted_on_remote', deletedAt: 4000 }],
+  };
+
+  const result = Store.mergeSyncData(localState, incomingData);
+
+  // Students: stu_common (updated), stu_only_local (kept), stu_new_remote (added) => 3 students
+  assert.equal(result.students.length, 3);
+  assert.equal(result.addedStudents, 1);
+  assert.equal(result.updatedStudents, 1);
+
+  const mergedCommonStu = result.students.find(
+    (s: { id: string }) => s.id === 'stu_common'
+  );
+  assert.equal(mergedCommonStu.defaultPrice, 2000);
+  assert.equal(mergedCommonStu.notes, 'Обновленная заметка B2');
+
+  // Lessons:
+  // - les_conflict_remote_newer (updated from remote)
+  // - les_conflict_local_newer (kept local version with updatedAt 5000)
+  // - les_new_from_remote (added from remote)
+  // - les_deleted_on_remote (removed because of remote deletedIds)
+  // - les_deleted_locally (ignored because of local deletedIds)
+  assert.equal(result.lessons.length, 3);
+  assert.equal(result.addedLessons, 1);
+  assert.equal(result.updatedLessons, 1);
+
+  const remoteNewerLesson = result.lessons.find(
+    (l: { id: string }) => l.id === 'les_conflict_remote_newer'
+  );
+  assert.equal(remoteNewerLesson.classwork, 'Новая тема с планшета');
+  assert.equal(remoteNewerLesson.isPaid, true);
+
+  const localNewerLesson = result.lessons.find(
+    (l: { id: string }) => l.id === 'les_conflict_local_newer'
+  );
+  assert.equal(localNewerLesson.classwork, 'Свежая локальная тема');
+  assert.equal(localNewerLesson.isPaid, true);
+
+  const resurrectedCheck = result.lessons.find(
+    (l: { id: string }) =>
+      l.id === 'les_deleted_locally' || l.id === 'les_deleted_on_remote'
+  );
+  assert.equal(resurrectedCheck, undefined);
+
+  assert.equal(
+    result.reportText,
+    'Добавлено уроков: 1, Обновлено: 1, Учеников: 2'
+  );
 });
 
 test('Rule A: propagateLessonToMonthEnd clones planned lessons until end of month with price and no duplicates', () => {
