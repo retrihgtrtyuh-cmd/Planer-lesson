@@ -146,42 +146,74 @@
   }
 
   /**
-   * Dynamically loads lightweight PeerJS WebRTC client when online for cross-device 6-digit P2P sync,
-   * while falling back cleanly if offline or in restricted WebView.
+   * Safely loads lightweight PeerJS WebRTC client when online for cross-device 6-digit P2P sync,
+   * validating response content first so HTML proxy/error pages never cause SyntaxError: Unexpected token '<'.
    */
   function loadPeerJsClientIfAvailable() {
     if (typeof window === 'undefined') return Promise.resolve(null);
     if (window.Peer) return Promise.resolve(window.Peer);
+    if (
+      (window.location && window.location.protocol === 'file:') ||
+      (typeof navigator !== 'undefined' && navigator.onLine === false) ||
+      typeof fetch !== 'function'
+    ) {
+      return Promise.resolve(null);
+    }
     if (peerJsLoadPromise) return peerJsLoadPromise;
 
     peerJsLoadPromise = new Promise(function (resolve) {
       var done = false;
+      var controller =
+        typeof AbortController === 'function' ? new AbortController() : null;
       var timer = setTimeout(function () {
         if (!done) {
           done = true;
+          if (controller) {
+            try {
+              controller.abort();
+            } catch (e) {
+              // Ignore abort error
+            }
+          }
           resolve(window.Peer || null);
         }
       }, 3500);
 
       try {
-        var script = document.createElement('script');
-        script.src = 'https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js';
-        script.async = true;
-        script.onload = function () {
-          if (!done) {
+        fetch('https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js', {
+          method: 'GET',
+          signal: controller ? controller.signal : undefined,
+        })
+          .then(function (res) {
+            if (!res || !res.ok) return '';
+            var contentType = (res.headers && res.headers.get('content-type')) || '';
+            if (contentType.indexOf('text/html') !== -1) return '';
+            return res.text();
+          })
+          .then(function (codeText) {
+            if (done) return;
             done = true;
             clearTimeout(timer);
+            var trimmed = String(codeText || '').trim();
+            if (!trimmed || trimmed.charAt(0) === '<') {
+              resolve(null);
+              return;
+            }
+            try {
+              var runner = new Function(trimmed);
+              runner.call(window);
+            } catch (evalErr) {
+              // Ignore evaluation errors in restricted environments
+            }
             resolve(window.Peer || null);
-          }
-        };
-        script.onerror = function () {
-          if (!done) {
-            done = true;
-            clearTimeout(timer);
-            resolve(null);
-          }
-        };
-        document.head.appendChild(script);
+          })
+          .catch(function () {
+            if (!done) {
+              done = true;
+              clearTimeout(timer);
+              resolve(null);
+            }
+          });
       } catch (e) {
         if (!done) {
           done = true;

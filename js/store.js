@@ -228,10 +228,20 @@
   }
 
   function parseDatabaseBackupJSON(jsonStringOrObject) {
-    var parsed =
-      typeof jsonStringOrObject === 'string'
-        ? JSON.parse(jsonStringOrObject)
-        : jsonStringOrObject;
+    var parsed = jsonStringOrObject;
+    if (typeof jsonStringOrObject === 'string') {
+      var trimmed = jsonStringOrObject.trim();
+      if (!trimmed || trimmed.charAt(0) === '<') {
+        throw new Error(
+          'Некорректный формат файла синхронизации (ожидается JSON, а не HTML/текст).'
+        );
+      }
+      try {
+        parsed = JSON.parse(trimmed);
+      } catch (e) {
+        throw new Error('Некорректный формат JSON в данных синхронизации.');
+      }
+    }
 
     if (!parsed || !Array.isArray(parsed.students) || !Array.isArray(parsed.lessons)) {
       throw new Error('Некорректный формат данных синхронизации.');
