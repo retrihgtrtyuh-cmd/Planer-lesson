@@ -124,10 +124,11 @@ jobs:
             if [ -f "$GRADLE_FILE" ]; then
               if [[ "$GRADLE_FILE" == *.kts ]]; then
                 sed -i -E "s/versionCode[[:space:]]*=[[:space:]]*[0-9]+/versionCode = ${VERSION_CODE}/g" "$GRADLE_FILE"
-                sed -i -E "s/versionName[[:space:]]*=[[:space:]]*"[^"]*"/versionName = "${VERSION_NAME}"/g" "$GRADLE_FILE"
+                sed -i -E "s/versionName[[:space:]]*=[[:space:]]*\"[^\"]*\"/versionName = \"${VERSION_NAME}\"/g" "$GRADLE_FILE"
               else
                 sed -i -E "s/versionCode[[:space:]]*=*[[:space:]]*[0-9]+/versionCode ${VERSION_CODE}/g" "$GRADLE_FILE"
-                sed -i -E "s/versionName[[:space:]]*=*[[:space:]]*['"][^'"]*['"]/versionName "${VERSION_NAME}"/g" "$GRADLE_FILE"
+                sed -i -E "s/versionName[[:space:]]*=*[[:space:]]*\"[^\"]*\"/versionName \"${VERSION_NAME}\"/g" "$GRADLE_FILE"
+                sed -i -E "s/versionName[[:space:]]*=*[[:space:]]*'[^']*'/versionName \"${VERSION_NAME}\"/g" "$GRADLE_FILE"
               fi
               echo "Обновлена версия в $GRADLE_FILE -> versionCode=${VERSION_CODE}, versionName=${VERSION_NAME}"
             fi
